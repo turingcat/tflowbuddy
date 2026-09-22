@@ -7,7 +7,13 @@
 
 TFlowBuddy 是面向 TFlow 账户的 Electron 桌面客户端。第一阶段在 DeepSeek Harness 的 `apps/desktop` 中完成 AIBuddy 产品能力迁移，支持登录、凭证注入、模型获取、余额、账户菜单和订阅信息展示。
 
-客户端只发布两个目标：macOS Apple Silicon（arm64）和 Windows x64。Windows 最低支持 Windows 10。第一阶段不提供 Web、CLI、移动端、Linux、macOS Intel、Windows arm64 或本地 Broker 服务。
+客户端只发布两个目标：macOS Apple Silicon（arm64）和 Windows x64。Windows 最低支持 Windows 11（第 7 节记录与 Windows 10 的冲突及改判）。不提供 Web、CLI、移动端、Linux、macOS Intel、Windows arm64 或本地 Broker 服务。
+
+**目标读者是只使用中文桌面应用、不使用命令行也不使用浏览器的普通用户。** 因此：
+
+- 用户可见路径全部以简体中文呈现，欢迎页与登录流程无论操作系统语言如何都以中文打开；工作区保留共享语言偏好；
+- 不要求用户理解环境变量、模型密钥或配置文件，也不提供粘贴密钥的引导；
+- 账户相关操作只通过跳转 `https://tflow.online` 完成，桌面端不承载交易。
 
 账户能力只面向当前桌面应用；“多客户端”不属于本项目范围。macOS 和 Windows 是同一桌面客户端的两个发布目标，不要求额外的跨客户端共享服务。
 
@@ -25,6 +31,8 @@ TFlowBuddy 是面向 TFlow 账户的 Electron 桌面客户端。第一阶段在 
 - macOS arm64 和 Windows x64 的打包身份。
 
 原 DeepSeek 产品身份、DeepSeek 账户登录和官方模型配置不得继续出现在 TFlowBuddy 用户可见路径。通用 Harness 能力继续保留，产品差异必须通过 edition/provider 边界表达。
+
+阶段 1、2 的实现记录见 [TFlowBuddy 桌面发行版 Agent Note](../../../.agents/notes/implemented/architecture/2026-09-22-tflowbuddy-desktop-edition.md)。
 
 ## 3. 模块设计
 
