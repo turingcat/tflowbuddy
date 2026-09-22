@@ -159,9 +159,9 @@ IPC 返回类型使用闭合 discriminated unions 表达成功、认证失效、
 | 目标 | 架构 | 最低版本 |
 |---|---|---|
 | macOS | Apple Silicon / arm64 | 按现有 Electron 支持矩阵确认最低 macOS 版本 |
-| Windows | x64 | Windows 10 |
+| Windows | x64 | Windows 11 |
 
-计划阶段必须核对现有 `apps/desktop` 的 Electron、原生模块、keyring、安装器和更新器是否满足 Windows 10；若当前依赖最低版本高于 Windows 10，必须在计划中明确替代方案或记录阻塞，不通过静默降级解决。
+阶段 0 核验结论：仓库锁定 Electron 44（`pnpm-lock.yaml`），上游自 Electron 40 起已将最低 Windows 版本提升到 Windows 11，因此 **Windows 10 不在支持范围内**。用户已确认按 Windows 11 重新确认需求。若后续必须支持 Windows 10，只能通过降级 Electron 主版本实现，那会同时改动版本资格、签名、运行时锁和发布测试，需要单独立项。
 
 macOS Intel、Windows arm64、Linux 的构建目标和测试矩阵不属于本次交付。跨平台共享 TypeScript 适配器；平台差异集中在凭证存储、应用路径、打包资源、安装器和更新配置。
 
@@ -240,9 +240,11 @@ TypeSafe 只用于对不确定的产品设计选择进行结构化判断；接�
 2. TFlow gateway 是否稳定支持 `GET /v1/models` 及聊天请求；
 3. 账户余额和订阅同时存在时的展示优先级与文案；
 4. 无订阅但有余额、余额为零、订阅过期、订阅额度耗尽等状态；
-5. Windows 10 的 Electron/原生依赖/keyring/更新器兼容性；
+5. ~~Windows 10 的 Electron/原生依赖/keyring/更新器兼容性~~ —— 已核验为不兼容，平台下限改为 Windows 11（见第 7 节）；
 6. TFlowBuddy 图标、bundle identity、协议名和用户数据目录命名；
 7. 模型 key 的名称、作用域、轮换与撤销策略。
+
+第 1、2、4、7 项的核验结论见 `2026-09-22-tflowbuddy-phase-0-baseline.md`。
 
 ## 11. 用户确认记录
 

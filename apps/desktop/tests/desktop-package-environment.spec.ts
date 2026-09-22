@@ -120,10 +120,10 @@ describe('Desktop local packaging configuration', () => {
 
   it('checks application and update configuration before Windows credentials while preserving unsigned and preparation modes', () => {
     expect(() => {
-      validateDesktopPackageEnvironment({}, WINDOWS, { unsigned: true })
-    }).toThrow(/DSH_DESKTOP_APP_ID/u)
+      validateDesktopPackageEnvironment({ ...POLICY, DSH_DESKTOP_APP_ID: 'invalid' }, WINDOWS, { unsigned: true })
+    }).toThrow(/reverse-DNS/u)
     expect(() => {
-      validateDesktopPackageEnvironment({ DSH_DESKTOP_APP_ID: 'invalid' }, WINDOWS)
+      validateDesktopPackageEnvironment({ ...POLICY, DSH_DESKTOP_APP_ID: 'invalid' }, WINDOWS)
     }).toThrow(/reverse-DNS/u)
     expect(() => {
       validateDesktopPackageEnvironment({ ...POLICY, DSH_DESKTOP_APP_ID: RELEASE.DSH_DESKTOP_APP_ID }, WINDOWS)

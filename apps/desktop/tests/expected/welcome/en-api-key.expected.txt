@@ -1,7 +1,7 @@
-DeepSeek Harness
-DeepSeek Harness
+TFlowBuddy
+TFlowBuddy
 Add an API key to get started
-Configure official DeepSeek models to start using Harness
+Configure official DeepSeek models to start using TFlowBuddy
 Enter API key [password]
 Save and continue [disabled]
 Set up later

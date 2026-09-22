@@ -1,5 +1,5 @@
-DeepSeek Harness
-DeepSeek Harness
+TFlowBuddy
+TFlowBuddy
 Sign in timed out
 Sign in again
 Add API Key

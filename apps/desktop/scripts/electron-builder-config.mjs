@@ -27,11 +27,10 @@ import { installWindowsDirectoryInstaller } from './windows-directory-installer.
 import { preserveWindowsRuntimeSignature, signWindowsCode } from './windows-runtime-signature.mjs'
 import { prepareWindowsAsarUnpack, verifyWindowsAsarUnpack } from './windows-asar-unpack.mjs'
 import { recordPackagingEvent } from './packaging-run.mjs'
-import {
-  resolveMacOSAppUpdateFeed,
-  verifyMacOSAppUpdateConfig,
-  writeMacOSAppUpdateConfig,
-} from './macos-app-update-config.mjs'
+import { resolveMacOSAppUpdateFeed, verifyMacOSAppUpdateConfig, writeMacOSAppUpdateConfig } from './macos-app-update-config.mjs'
+import { desktopEdition } from '../src/edition.ts'
+
+const iconResource = suffix => fileURLToPath(new URL(`../resources/${desktopEdition.iconStem}.${suffix}`, import.meta.url))
 
 /**
  * Create electron-builder configuration from one release environment.
@@ -98,15 +97,15 @@ export function createElectronBuilderConfig(
   const packaged = resolveDesktopBuildCommit(env)
   return {
     appId,
-    protocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }],
+    protocols: [{ name: desktopEdition.protocolName, schemes: [desktopEdition.protocol] }],
     extraMetadata: {
       dshDesktopAppId: appId,
       dshMandatoryUpdatePolicy: policy,
       ...buildVersion === productVersion ? {} : { version: buildVersion },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
-    productName: 'DeepSeek Harness',
-    artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
+    productName: desktopEdition.productName,
+    artifactName: `${desktopEdition.artifactStem}-\${version}-\${os}-\${arch}.\${ext}`,
     directories: { output: unsigned ? buildPaths.unsignedArtifacts : buildPaths.artifacts },
     asar: true,
     electronDist: buildPaths.electron,
@@ -141,17 +140,16 @@ export function createElectronBuilderConfig(
     asarUnpack: unpack,
     extraResources: [
       { from: buildPaths.runtime, to: 'runtime' },
-      { from: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)), to: 'icon.png' },
+      { from: iconResource('png'), to: 'icon.png' },
     ],
     mac: {
-      icon: fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
+      icon: iconResource('icns'),
       category: 'public.app-category.developer-tools',
       // macOS matches the application locale against this bundle, not Electron Framework resources.
-      extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'] },
+      extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'], NSMicrophoneUsageDescription: `${desktopEdition.productName} uses your microphone to transcribe speech into message drafts.` },
       identity: macOSSigning?.signingIdentity,
       forceCodeSigning: true,
       hardenedRuntime: true,
-      extendInfo: { NSMicrophoneUsageDescription: 'DeepSeek Harness uses your microphone to transcribe speech into message drafts.' },
       // ASAR-unpacked native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
       signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
       notarize: true,
@@ -160,6 +158,7 @@ export function createElectronBuilderConfig(
     dmg: {
       sign: true,
       writeUpdateInfo: false,
+      title: desktopEdition.productName,
     },
     beforePack: async context => {
       if (packagesWindows) windowsCode = await prepareWindowsAsarUnpack(context, buildPaths.dsh)
@@ -211,7 +210,7 @@ export function createElectronBuilderConfig(
       )
     },
     win: {
-      icon: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)),
+      icon: iconResource('ico'),
       forceCodeSigning: !unsigned,
       signtoolOptions: {
         sign: windowsSigner,

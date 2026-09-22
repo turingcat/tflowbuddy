@@ -1,5 +1,7 @@
 /** Resolve public release identifiers supplied by the packaging environment. */
 
+import { desktopEdition as DESKTOP_EDITION } from '../src/edition.ts'
+
 /** Environment variable that supplies the Electron application identifier. */
 export const DESKTOP_APP_ID_ENV = 'DSH_DESKTOP_APP_ID'
 
@@ -57,11 +59,14 @@ export function resolveNpmRegistry(env) {
 
 /**
  * Resolve and validate the application identifier shared by every platform target.
+ * An absent variable takes the edition's bundle identifier, because a reverse-DNS product
+ * identity is a property of the edition rather than of one release environment.
  * @param {NodeJS.ProcessEnv} env - Packaging environment.
  * @returns {string} Reverse-DNS application identifier.
  */
 export function resolveDesktopAppId(env) {
-  const appId = requireEnvironmentValue(env, DESKTOP_APP_ID_ENV)
+  const configured = env[DESKTOP_APP_ID_ENV]?.trim()
+  const appId = configured === undefined || configured === '' ? DESKTOP_EDITION.bundleId : configured
   if (!/^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/u.test(appId)) {
     throw new Error(`desktop release environment: ${DESKTOP_APP_ID_ENV} must be a reverse-DNS identifier`)
   }
