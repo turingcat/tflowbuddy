@@ -13,10 +13,19 @@ const CREDENTIALS = {
   panelUrl: 'https://tflow.online',
 }
 
+/** One recorded Host call. */
+interface RecordedCall { namespace: string; method: string; args: Record<string, unknown> }
+
+/** The JSON text one request carried; the client always sends a string body. */
+function requestBody(init: RequestInit | undefined): string {
+  if (typeof init?.body !== 'string') throw new Error('expected a JSON string body')
+  return init.body
+}
+
 /** Record one call and answer what the named namespace should answer. */
-function invoke(answers: Record<string, unknown> = {}): HostInvoke & { calls: Array<{ namespace: string, method: string, args: Record<string, unknown> }> } {
-  const calls: Array<{ namespace: string, method: string, args: Record<string, unknown> }> = []
-  const call = (request: { namespace: string, method: string, args: Record<string, unknown> }): Promise<unknown> => {
+function invoke(answers: Record<string, unknown> = {}): HostInvoke & { calls: RecordedCall[] } {
+  const calls: RecordedCall[] = []
+  const call = (request: { namespace: string; method: string; args: Record<string, unknown> }): Promise<unknown> => {
     calls.push(request)
     const key = `${request.namespace}/${request.method}`
     if (key in answers) return Promise.resolve(answers[key])
@@ -134,7 +143,7 @@ describe('connectHostRpc', () => {
   function transport(craft: (rpcId: string) => unknown, status = 200): (input: string, init?: RequestInit) => Promise<Response> {
     return vi.fn((input: string, init?: RequestInit) => {
       if (!input.includes('/api/')) return Promise.resolve(new Response('index', { status: 200 }))
-      const body = JSON.parse(String(init?.body)) as { rpcId: string }
+      const body = JSON.parse(requestBody(init)) as { rpcId: string }
       return Promise.resolve(Response.json(craft(body.rpcId), { status }))
     })
   }
@@ -161,7 +170,7 @@ describe('connectHostRpc', () => {
     const request = (send as unknown as { mock: { calls: Array<[string, RequestInit]> } }).mock.calls.at(-1)!
     expect(request[0]).toBe('http://127.0.0.1:3080/api/llm/listModels')
     expect(request[1]).toMatchObject({ method: 'POST', credentials: 'include', redirect: 'error' })
-    expect(JSON.parse(String(request[1].body))).toMatchObject({
+    expect(JSON.parse(requestBody(request[1]))).toMatchObject({
       type: 'client-request', method: 'llm/listModels', payload: { args: { provider: 'tflow' } },
     })
   })
@@ -170,7 +179,7 @@ describe('connectHostRpc', () => {
     ['a failed status', () => ({ type: 'server-response', rpcId: null, result: { ok: true, value: 1 } }), 500, /Web request failed/u],
     ['a non-envelope body', () => 'plain', 200, /Web RPC failed/u],
     ['a mismatched rpcId', () => ({ type: 'server-response', rpcId: 'other', result: { ok: true, value: 1 } }), 200, /Web RPC failed/u],
-    ['a failed result', rpcId => ({ type: 'server-response', rpcId, result: { ok: false } }), 200, /Web RPC failed/u],
+    ['a failed result', (rpcId: string) => ({ type: 'server-response', rpcId, result: { ok: false } }), 200, /Web RPC failed/u],
   ])('classifies %s', async (_label, craft, status, expected) => {
     const call = await connectHostRpc('http://127.0.0.1:3080/?token=t', transport(craft, status))
     await expect(call({ namespace: 'settings', method: 'describe', args: {} })).rejects.toThrow(expected)

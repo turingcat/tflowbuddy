@@ -14,7 +14,7 @@ function fakeVault(available = true): TFlowVault {
   return {
     available: () => available,
     encrypt: value => Buffer.from(`sealed:${value}`, 'utf8'),
-    decrypt: value => {
+    decrypt: (value) => {
       const text = value.toString('utf8')
       if (!text.startsWith('sealed:')) throw new Error('not sealed by this vault')
       return text.slice('sealed:'.length)
@@ -23,7 +23,7 @@ function fakeVault(available = true): TFlowVault {
 }
 
 /** In-memory document location. */
-function memoryFiles(initial?: string): TFlowVaultFiles & { text: string | undefined, writes: string[] } {
+function memoryFiles(initial?: string): TFlowVaultFiles & { text: string | undefined; writes: string[] } {
   const files = {
     text: initial,
     writes: [] as string[],
@@ -60,10 +60,10 @@ describe('encodeTFlowCredentials', () => {
   })
 
   it('omits the optional fields a panel without them leaves unset', () => {
+    const { groupId: _groupId, ...withoutGroup } = CREDENTIALS
     const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials({
-      ...CREDENTIALS,
+      ...withoutGroup,
       session: { accessToken: 'access-token' },
-      groupId: undefined,
     }, fakeVault()))
     expect('refreshToken' in parsed).toBe(false)
     expect('groupId' in parsed).toBe(false)

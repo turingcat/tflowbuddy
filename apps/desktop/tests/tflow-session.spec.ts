@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createTFlowSession, type TFlowAuthState, type TFlowSessionEffects } from '../src/tflow/session.ts'
 import type { TFlowCredentials } from '../src/tflow/credentials.ts'
 import type { TFlowFetch } from '../src/tflow/protocol.ts'

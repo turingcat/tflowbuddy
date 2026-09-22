@@ -118,6 +118,11 @@
     - id: ui-settings-account
       name: '@deepseek-ai/dsh-client-ui-settings-account'
 
+    # The TFlow edition's account surface. It reads the Electron shell's
+    # account bridge, so it stays dormant in an ordinary browser renderer.
+    - id: ui-settings-account-tflow
+      name: '@deepseek-ai/dsh-client-ui-settings-account-tflow'
+
     - id: account-controller
       name: '@deepseek-ai/dsh-api-account-controller'
 

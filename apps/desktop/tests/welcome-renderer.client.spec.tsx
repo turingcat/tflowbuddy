@@ -44,6 +44,7 @@ function mount(boot: TFlowLoginBootstrap = { state: { kind: 'signed-out' }, sett
     signOut: vi.fn(() => Promise.resolve<TFlowLoginView>({ kind: 'signed-out' })),
     cancel: vi.fn(() => Promise.resolve<TFlowLoginView>({ kind: 'signed-out' })),
     enterWorkspace,
+    account: vi.fn(() => Promise.resolve(undefined)),
     onView: (listener) => { publish = listener; return () => { publish = () => {} } },
   }
   render(<Welcome api={api} />)
