@@ -8,7 +8,7 @@
  */
 
 import type { TFlowAuthState } from './session.ts'
-import type { TFlowGroup } from './types.ts'
+import type { TFlowEntitlement, TFlowGroup } from './types.ts'
 
 /** Private welcome channels owning the TFlow flow. */
 export const TFLOW_IPC = {
@@ -20,12 +20,36 @@ export const TFLOW_IPC = {
   signOut: 'dsh-tflow:sign-out',
   cancel: 'dsh-tflow:cancel',
   enterWorkspace: 'dsh-tflow:enter-workspace',
+  account: 'dsh-tflow:account',
 } as const
 
 /** One selectable group, as the group step renders it. */
 export interface TFlowGroupView {
   readonly id: string
   readonly name: string
+}
+
+/** Remaining allowance the panel reported for one subscription window. */
+export interface TFlowRemainingView {
+  readonly daily?: number
+  readonly weekly?: number
+  readonly monthly?: number
+}
+
+/**
+ * What the signed-in account draws on, as an account surface renders it.
+ *
+ * Balance and subscription are independent server facts and both may exist; the
+ * client reports whichever the panel served for the selected group and never
+ * derives one from the other.
+ */
+export interface TFlowAccountView {
+  /** Address prefix the panel derives the display name from. */
+  readonly displayName: string
+  /** Panel balance in USD, as the panel reports it. */
+  readonly balance: number
+  /** Present when a subscription covers the selected group. */
+  readonly subscription?: { readonly groupName: string, readonly remaining: TFlowRemainingView }
 }
 
 /**
@@ -60,6 +84,21 @@ export interface TFlowLoginBootstrap {
   readonly state: TFlowLoginView
   /** Absent while the panel settings could not be read; the form then blocks submission. */
   readonly settings?: TFlowLoginSettings
+}
+
+/**
+ * Project one panel entitlement onto the account view.
+ * @param entitlement - what the panel reported.
+ * @returns the credential-free account view.
+ */
+export function accountView(entitlement: TFlowEntitlement): TFlowAccountView {
+  return entitlement.kind === 'subscription'
+    ? {
+        displayName: entitlement.account.displayName,
+        balance: entitlement.account.balance,
+        subscription: { groupName: entitlement.groupName, remaining: entitlement.remaining },
+      }
+    : { displayName: entitlement.account.displayName, balance: entitlement.account.balance }
 }
 
 /**

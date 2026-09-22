@@ -1,7 +1,7 @@
 /** Localized TFlow sign-in operations for the isolated welcome renderer. */
 
 import { contextBridge, ipcRenderer } from 'electron'
-import { TFLOW_IPC, type TFlowLoginBootstrap, type TFlowLoginView, type TFlowStartInput } from './tflow/login-api.ts'
+import { TFLOW_IPC, type TFlowAccountView, type TFlowLoginBootstrap, type TFlowLoginView, type TFlowStartInput } from './tflow/login-api.ts'
 import { resolveWelcomeLocale, isWelcomeLocale, type DesktopLocale } from './locale.ts'
 
 /** Window argument carrying the locale the shell created this window with. */
@@ -25,6 +25,8 @@ export interface TFlowWelcomeApi {
   cancel(): Promise<TFlowLoginView>
   /** Ask the shell to reveal the workspace; used when the stored record was already valid. */
   enterWorkspace(): Promise<void>
+  /** @returns what the panel reports the account draws on, or undefined while signed out. */
+  account(): Promise<TFlowAccountView | undefined>
   /** @param listener - view recipient. @returns subscription disposer. */
   onView(listener: (view: TFlowLoginView) => void): () => void
 }
@@ -41,6 +43,7 @@ const api: TFlowWelcomeApi = {
   signOut: () => ipcRenderer.invoke(TFLOW_IPC.signOut) as Promise<TFlowLoginView>,
   cancel: () => ipcRenderer.invoke(TFLOW_IPC.cancel) as Promise<TFlowLoginView>,
   enterWorkspace: () => ipcRenderer.invoke(TFLOW_IPC.enterWorkspace) as Promise<void>,
+  account: () => ipcRenderer.invoke(TFLOW_IPC.account) as Promise<TFlowAccountView | undefined>,
   onView: (listener) => {
     const receive = (_event: Electron.IpcRendererEvent, view: TFlowLoginView): void => { listener(view) }
     ipcRenderer.on(TFLOW_IPC.state, receive)

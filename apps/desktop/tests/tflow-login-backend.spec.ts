@@ -312,6 +312,59 @@ describe('cancel', () => {
   })
 })
 
+describe('account', () => {
+  /** Routes a signed-in session plus one entitlement read. */
+  function signedInRoutes(entitlement: unknown, account: unknown = { email: 'alice@example.com', balance: 12.34 }) {
+    return [
+      ['/api/v1/auth/me', () => panel(account)],
+      ['/api/v1/subscriptions/progress', () => panel(entitlement)],
+      ['/api/v1/settings/public', () => panel(SETTINGS)],
+      ['/api/v1/auth/login', () => panel({ access_token: 'access', refresh_token: 'refresh' })],
+      ['/api/v1/groups/available', () => panel([{ id: 7, name: '默认分组' }])],
+      ['/api/v1/keys?', () => panel({ items: [{ name: 'TFlowBuddy', status: 'active', key: 'sk-model', group_id: 7 }] })],
+      ['/v1/models', () => gateway({ data: [{ id: 'glm-5' }] })],
+    ] as Array<[string, () => Response]>
+  }
+
+  /** Sign one backend in through the group step. */
+  async function signedIn(fetchImpl: TFlowFetch) {
+    const context = backend({ fetch: fetchImpl })
+    await context.backend.bootstrap()
+    await context.backend.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
+    await context.backend.selectGroup('7')
+    return context
+  }
+
+  it('reports the balance when the selected group has no subscription', async () => {
+    const context = await signedIn(routed(signedInRoutes([])))
+    await expect(context.backend.account()).resolves.toEqual({ displayName: 'alice', balance: 12.34 })
+  })
+
+  it('reports the subscription the selected group is covered by', async () => {
+    const context = await signedIn(routed(signedInRoutes([
+      { subscription: { group_id: 7 }, progress: { group_name: '订阅套餐', daily: { remaining_usd: 1.5 }, monthly: { remaining_usd: 30 } } },
+    ])))
+    await expect(context.backend.account()).resolves.toEqual({
+      displayName: 'alice',
+      balance: 12.34,
+      subscription: { groupName: '订阅套餐', remaining: { daily: 1.5, monthly: 30 } },
+    })
+  })
+
+  it('reports nothing while no session is signed in', async () => {
+    const context = backend()
+    await expect(context.backend.account()).resolves.toBeUndefined()
+  })
+
+  it('surfaces a panel refusal so the caller can offer a retry', async () => {
+    const context = await signedIn(routed([
+      ['/api/v1/auth/me', () => new Response(JSON.stringify({ code: 401, message: '登录已失效' }), { status: 401 })],
+      ...signedInRoutes([]),
+    ]))
+    await expect(context.backend.account()).rejects.toThrow('登录已失效')
+  })
+})
+
 describe('signOut', () => {
   it('clears the record and stops the provider route', async () => {
     const context = backend()

@@ -558,6 +558,13 @@ async function main(): Promise<void> {
     windowsLanguage = locale.id
     installMenu()
   })
+  ipcMain.handle(DESKTOP_IPC.tflowAccount, async (event) => {
+    assertProductSender(event)
+    if (tflow === undefined) return null
+    // A failure is reported as null rather than as a rejected invoke: the
+    // account block shows a retry, and the session itself is unaffected.
+    return await tflow.account().catch(() => null)
+  })
   ipcMain.handle(DESKTOP_IPC.updatesStatus, (event) => {
     assertProductSender(event)
     return presentDesktopUpdate(updates.state)

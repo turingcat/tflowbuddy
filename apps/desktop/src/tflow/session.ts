@@ -177,7 +177,14 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
     const modelKey = await ensureModelKey(request, base.session.accessToken, groupId, newIdempotencyKey())
     const models = await listModels({ ...request, gatewayUrl: base.gatewayUrl }, modelKey.key)
     if (models.length === 0) throw new TFlowProtocolError('protocol', 'TFlow 网关未返回可用模型')
-    const credentials: TFlowCredentials = { ...base, modelKey: modelKey.key }
+    // The binding is persisted with the key: the account read asks the panel for
+    // the subscription covering this group, and a later sign-in reuses the key
+    // this group owns rather than provisioning a second one.
+    const credentials: TFlowCredentials = {
+      ...base,
+      modelKey: modelKey.key,
+      groupId: modelKey.groupId ?? groupId,
+    }
     await options.effects.save(credentials)
     // The advertised catalog travels with the key: the route declares the
     // models the gateway serves, so a gateway that renames or retires one is

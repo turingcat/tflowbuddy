@@ -9,10 +9,10 @@
  * @module
  */
 
-import { fetchPublicSettings, type TFlowFetch } from './protocol.ts'
+import { fetchEntitlement, fetchPublicSettings, type TFlowFetch } from './protocol.ts'
 import type { TFlowCredentialStore, TFlowCredentials } from './credentials.ts'
 import { createTFlowSession, type TFlowSessionEffects } from './session.ts'
-import { loginView, type TFlowLoginBootstrap, type TFlowLoginSettings, type TFlowLoginView, type TFlowStartInput } from './login-api.ts'
+import { accountView, loginView, type TFlowAccountView, type TFlowLoginBootstrap, type TFlowLoginSettings, type TFlowLoginView, type TFlowStartInput } from './login-api.ts'
 
 /** Effects the shell supplies for the hosted provider route. */
 export interface TFlowProviderRoute {
@@ -53,6 +53,12 @@ export interface TFlowLoginBackend {
   signOut(): Promise<TFlowLoginView>
   /** Abandon an attempt without touching stored credentials. @returns the restored state. */
   cancel(): Promise<TFlowLoginView>
+  /**
+   * Read what the panel reports the account draws on.
+   * @returns the account view, or `undefined` when no session is signed in.
+   * @throws Error when the panel refuses or is unreachable, so the caller can offer a retry.
+   */
+  account(): Promise<TFlowAccountView | undefined>
   /** @param listener - view recipient. @returns subscription disposer. */
   subscribe(listener: (view: TFlowLoginView) => void): () => void
 }
@@ -185,6 +191,13 @@ export function createTFlowLoginBackend(options: TFlowLoginBackendOptions): TFlo
       // Cancelling an attempt leaves stored credentials alone: the user may
       // have backed out of a second sign-in while a usable record exists.
       return loginView(await session.abandon())
+    },
+
+    async account() {
+      const state = session.state()
+      if (state.kind !== 'authenticated') return undefined
+      const { credentials } = state
+      return accountView(await fetchEntitlement(requestOptions, credentials.session.accessToken, credentials.groupId))
     },
 
     subscribe(listener) {

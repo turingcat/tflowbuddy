@@ -14,6 +14,7 @@ export const DESKTOP_IPC = {
   directoryPick: 'dsh-desktop:directory-pick',
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
   localeChanged: 'dsh-desktop:locale-changed',
+  tflowAccount: 'dsh-desktop:tflow-account',
   updatesStatus: 'dsh-desktop:updates-status',
   updatesOpen: 'dsh-desktop:updates-open',
   updatesPresentation: 'dsh-desktop:updates-presentation',

@@ -9,13 +9,13 @@
  */
 
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
-import { TFLOW_IPC, type TFlowLoginBootstrap, type TFlowLoginView, type TFlowStartInput } from './login-api.ts'
+import { TFLOW_IPC, type TFlowAccountView, type TFlowLoginBootstrap, type TFlowLoginView, type TFlowStartInput } from './login-api.ts'
 import type { TFlowLoginBackend } from './login-backend.ts'
 
 /** Channels this bridge registers and therefore removes. */
 const REQUEST_CHANNELS = [
   TFLOW_IPC.bootstrap, TFLOW_IPC.start, TFLOW_IPC.complete,
-  TFLOW_IPC.selectGroup, TFLOW_IPC.signOut, TFLOW_IPC.cancel, TFLOW_IPC.enterWorkspace,
+  TFLOW_IPC.selectGroup, TFLOW_IPC.signOut, TFLOW_IPC.cancel, TFLOW_IPC.enterWorkspace, TFLOW_IPC.account,
 ] as const
 
 /**
@@ -50,6 +50,7 @@ export function installTFlowLoginIpc(
   request<TFlowLoginView>(TFLOW_IPC.signOut, () => backend.signOut())
   request<TFlowLoginView>(TFLOW_IPC.cancel, () => backend.cancel())
   request<void>(TFLOW_IPC.enterWorkspace, () => enterWorkspace())
+  request<TFlowAccountView | undefined>(TFLOW_IPC.account, () => backend.account())
 
   const unsubscribe = backend.subscribe((view) => {
     if (!active || window.isDestroyed()) return

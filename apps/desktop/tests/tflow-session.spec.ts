@@ -122,6 +122,9 @@ describe('createTFlowSession', () => {
         panelUrl: PANEL,
         gatewayUrl: 'https://tflow.online/v1',
         modelKey: 'sk-model',
+        // The binding travels with the key: the account read asks the panel for
+        // this group's subscription, and a later sign-in reuses this key.
+        groupId: '7',
       },
     })
     expect(record.saved).toEqual([(state as Extract<TFlowAuthState, { kind: 'authenticated' }>).credentials])
