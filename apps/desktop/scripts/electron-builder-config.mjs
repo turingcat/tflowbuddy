@@ -144,18 +144,20 @@ export function createElectronBuilderConfig(
     mac: {
       icon: iconResource('icns'),
       category: 'public.app-category.developer-tools',
+      // An unsigned local build has no Developer ID; requiring one would fail
+      // packaging instead of producing a launchable application.
+      forceCodeSigning: !unsigned,
       // macOS matches the application locale against this bundle, not Electron Framework resources.
       extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'], NSMicrophoneUsageDescription: `${desktopEdition.productName} uses your microphone to transcribe speech into message drafts.` },
       identity: macOSSigning?.signingIdentity,
-      forceCodeSigning: true,
       hardenedRuntime: true,
       // ASAR-unpacked native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
       signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
-      notarize: true,
+      notarize: !unsigned,
       target: ['dmg', 'zip'],
     },
     dmg: {
-      sign: true,
+      sign: !unsigned,
       writeUpdateInfo: false,
       title: desktopEdition.productName,
     },
@@ -198,9 +200,12 @@ export function createElectronBuilderConfig(
         await verifyMacOSAppUpdateConfig(appPath, resolveMacOSAppUpdateFeed(context.packager.config.publish),
           context.packager.appInfo.updaterCacheDirName)
       }
+      if (unsigned) return
       verifyMacOSSignatureAfterSign(context, macOSSigning ?? resolveMacOSSigningEnvironment(env))
     },
     artifactBuildCompleted: artifact => {
+      // Notarization needs Apple credentials this build does not carry.
+      if (unsigned) return
       if (!artifact.file.endsWith('.dmg')) return
       return notarizeMacOSDiskImageArtifact(
         artifact,

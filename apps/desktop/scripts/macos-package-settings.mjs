@@ -37,11 +37,22 @@ export function resolveMacOSPackageSettings(environment) {
  */
 export function macOSDownloadEnvironment(environment, proxyUrl) {
   if (proxyUrl === undefined) return { ...environment }
+  // A configured mirror is reachable directly, and routing it through the proxy
+  // is what breaks its transfer; every other host keeps the proxy.
+  const mirrorHosts = ['DSH_DESKTOP_ELECTRON_MIRROR', 'DSH_DESKTOP_NODE_MIRROR', 'DSH_DESKTOP_PYTHON_MIRROR']
+    .flatMap(name => {
+      const value = environment[name]?.trim()
+      if (!value) return []
+      try { return [new URL(value).hostname] } catch { return [] }
+    })
+  const bypass = ['localhost', '127.0.0.1', '::1', ...mirrorHosts].join(',')
+  const electronMirror = environment.DSH_DESKTOP_ELECTRON_MIRROR?.trim()
   return {
     ...Object.fromEntries(Object.entries(environment).filter(([name]) =>
       !/^(?:(?:https?|all|no)_proxy|npm_config_(?:https?_proxy|proxy|noproxy)|ELECTRON_GET_USE_PROXY)$/iu.test(name))),
+    ...electronMirror === undefined || electronMirror === '' ? {} : { ELECTRON_MIRROR: electronMirror },
     HTTP_PROXY: proxyUrl, HTTPS_PROXY: proxyUrl, http_proxy: proxyUrl, https_proxy: proxyUrl,
-    NO_PROXY: 'localhost,127.0.0.1,::1', no_proxy: 'localhost,127.0.0.1,::1',
+    NO_PROXY: bypass, no_proxy: bypass,
     ELECTRON_GET_USE_PROXY: '1',
   }
 }

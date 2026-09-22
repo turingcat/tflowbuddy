@@ -10,6 +10,7 @@ import {
 } from './desktop-auto-update-environment.mjs'
 import { desktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { packageMacOSArtifacts, type DesktopPrepackagedArtifact } from './package-macos.ts'
+import { desktopEdition } from '../src/edition.ts'
 import { loadDesktopPackageEnvironment, validateDesktopPackageEnvironment } from './desktop-package-environment.mjs'
 import { createPackagingRun, recordPackagingEvent } from './packaging-run.mjs'
 import { withWindowsSigningStage } from './windows-signing-stage.mjs'
@@ -95,7 +96,7 @@ export function withoutWindowsSigningEnvironment(environment: NodeJS.ProcessEnv)
 /**
  * Select signing and NSIS-compatible archive filters for electron-builder.
  * @param environment - Target packaging environment.
- * @param unsigned - Whether to create a local unsigned Windows artifact.
+ * @param unsigned - Whether to create a local unsigned artifact for either platform.
  * @returns Packaging environment without certificate inputs for unsigned builds.
  */
 export function desktopElectronBuilderEnvironment(environment: NodeJS.ProcessEnv, unsigned: boolean): NodeJS.ProcessEnv {
@@ -234,8 +235,17 @@ export function parseDesktopPackageInvocation(
   })
   if (positionals.length > 1) throw new Error('desktop package: expected at most one target')
   const name = positionals[0] ?? hostTargetName(hostPlatform, hostArch)
-  if (values.unsigned && name !== 'win-x64') throw new Error('desktop package: --unsigned requires win-x64')
-  if (values.unsigned && values['prepare-only']) throw new Error('desktop package: --unsigned cannot use --prepare-only')
+  // Windows has no release signing requirement in a local build, and macOS has
+  // no Developer ID on a development machine; both produce a launchable local
+  // artifact that is never distributed.
+  if (values.unsigned && name !== 'win-x64' && name !== 'mac-arm64' && name !== 'mac-x64') {
+    throw new Error('desktop package: --unsigned requires a Windows x64 or macOS target')
+  }
+  // An unsigned macOS build prepares its runtime without credentials, so the
+  // two modes compose there; Windows preparation still requires its signer.
+  if (values.unsigned && values['prepare-only'] && name === 'win-x64') {
+    throw new Error('desktop package: --unsigned cannot use --prepare-only for Windows')
+  }
   const requestedBuildVersion = values['build-version']?.trim()
   if (values['build-version'] !== undefined && (requestedBuildVersion === undefined || requestedBuildVersion === '')) {
     throw new Error('desktop package: --build-version requires a value')
@@ -366,8 +376,12 @@ async function main(): Promise<void> {
       recordPackagingEvent(run.directory, { type: 'macos-settings', packConcurrency: settings.packConcurrency,
         downloadProxyConfigured: settings.downloadProxy !== undefined,
         notarizationProxyConfigured: settings.notarizationProxy !== undefined })
-      await packagingStep(run.directory, 'macos-package', () => withMacOSSigningKeychain(environment,
-        signingEnvironment => packageTarget(invocation, signingEnvironment, run)), secrets)
+      await packagingStep(run.directory, 'macos-package', () => invocation.unsigned
+        // A local unsigned build has no p12 to import, so it packages with the
+        // environment it already has.
+        ? packageTarget(invocation, environment, run)
+        : withMacOSSigningKeychain(environment,
+          signingEnvironment => packageTarget(invocation, signingEnvironment, run)), secrets)
     } else {
       await packagingStep(run.directory, 'windows-package', () => packageTarget(invocation, environment, run), secrets)
     }
@@ -414,6 +428,9 @@ export async function packageTarget(
     DSH_DESKTOP_TARGET_ARCH: target.arch,
   }
   const downloadEnv = macOSDownloadEnvironment(targetEnv, mac?.downloadProxy)
+  // The download environment owns the mirror wiring: `@electron/get` reads its
+  // mirror from it, and the primary-runtime builder reads the Node and CPython
+  // mirrors from the same one.
   const electronBuilderEnv = desktopElectronBuilderEnvironment(downloadEnv, invocation.unsigned)
   for (const name of WINDOWS_SIGNING_ENV_NAMES) {
     if (!invocation.unsigned && environment[name] !== undefined) electronBuilderEnv[name] = environment[name]
@@ -489,7 +506,10 @@ export async function packageTarget(
   } else if (target.platform === 'darwin') {
     await execute([...desktopElectronBuilderArguments(target, true), '--config.mac.notarize=false'], electronBuilderEnv)
     await execute(['exec', 'tsx', 'scripts/smoke-packaged-runtime.ts'], targetEnv)
-    const appPath = join(buildPaths.artifacts, target.arch === 'arm64' ? 'mac-arm64' : 'mac', 'DeepSeek Harness.app')
+    // A local unsigned build carries no Developer ID and no Apple credentials,
+    // so there is no ticket to request and none to staple.
+    if (invocation.unsigned) return
+    const appPath = join(buildPaths.artifacts, target.arch === 'arm64' ? 'mac-arm64' : 'mac', `${desktopEdition.productName}.app`)
     await withMacOSNotarizationProxy(mac?.notarizationProxy,
       () => notarizeMacOS({ appPath, ...resolveMacOSNotarizationEnvironment(environment) }), undefined, undefined, proxyEvent)
   } else {

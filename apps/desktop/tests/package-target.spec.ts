@@ -73,14 +73,18 @@ describe('desktop package target', () => {
     expect(desktopElectronBuilderArguments(target, true)).toContain('--dir')
   })
 
-  it('accepts unsigned Windows artifacts and rejects other targets or preparation-only use', () => {
+  it('accepts an unsigned artifact for either platform and rejects other targets or preparation-only use', () => {
     expect(parseDesktopPackageInvocation(['win-x64', '--unsigned'], 'win32', 'x64').unsigned).toBe(true)
     expect(parseDesktopPackageInvocation(['win-x64'], 'win32', 'x64').unsigned).toBe(false)
+    // macOS has no Developer ID on a development machine, so the local build
+    // accepts the same flag the Windows one does.
+    expect(parseDesktopPackageInvocation(['mac-arm64', '--unsigned'], 'darwin', 'arm64').unsigned).toBe(true)
+    expect(parseDesktopPackageInvocation(['mac-x64', '--unsigned'], 'darwin', 'arm64').unsigned).toBe(true)
     expect(parseDesktopPackageInvocation(['--unsigned', '--dir'], 'win32', 'x64')).toMatchObject({
       unsigned: true, directory: true,
     })
-    expect(() => parseDesktopPackageInvocation(['mac-arm64', '--unsigned'], 'darwin', 'arm64'))
-      .toThrow(/requires win-x64/u)
+    expect(() => parseDesktopPackageInvocation(['linux-x64', '--unsigned'], 'linux', 'x64'))
+      .toThrow(/requires a Windows x64 or macOS target/u)
     expect(() => parseDesktopPackageInvocation(['--unsigned', '--prepare-only'], 'win32', 'x64'))
       .toThrow(/cannot use --prepare-only/u)
   })

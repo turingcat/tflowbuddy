@@ -34,10 +34,27 @@ export async function downloadPrimaryRuntimeAsset(url: string, sha256: string, c
   return destination
 }
 
+/**
+ * Resolve one runtime archive URL against an optional mirror prefix.
+ * @param upstream - Canonical release URL.
+ * @param mirror - Mirror prefix from the packaging environment, or undefined.
+ * @param suffix - Path appended to the mirror prefix.
+ * @returns The URL to download.
+ */
+function runtimeAssetUrl(upstream: string, mirror: string | undefined, suffix: string): string {
+  return mirror === undefined ? upstream : `${mirror.replace(/\/+$/u, '')}/${suffix}`
+}
+
 async function pythonArchive(target: keyof typeof lock.targets, cache: string): Promise<string> {
   const artifact = lock.targets[target]
   const filename = `cpython-${lock.pythonVersion}+${lock.pythonRelease}-${artifact.pythonTarget}-install_only_stripped.tar.gz`
-  return downloadPrimaryRuntimeAsset(`https://github.com/astral-sh/python-build-standalone/releases/download/${lock.pythonRelease}/${encodeURIComponent(filename)}`, artifact.pythonSha256, cache)
+  const upstream = `https://github.com/astral-sh/python-build-standalone/releases/download/${lock.pythonRelease}/${encodeURIComponent(filename)}`
+  // A mirror stores release assets flat under the release tag, both spellings of
+  // the `+` in the filename resolving to the same archive.
+  return downloadPrimaryRuntimeAsset(
+    runtimeAssetUrl(upstream, process.env.DSH_DESKTOP_PYTHON_MIRROR?.trim() || undefined,
+      `${lock.pythonRelease}/${encodeURIComponent(filename)}`),
+    artifact.pythonSha256, cache)
 }
 
 /**
@@ -124,7 +141,10 @@ export async function preparePrimaryRuntime(options: PreparePrimaryRuntimeOption
     let pnpmVersion: string | undefined
     if (!options.pythonOnly) {
       const nodeFilename = `node-v${lock.nodeVersion}-${artifact.nodeArchive}`
-      const nodeArchive = await downloadPrimaryRuntimeAsset(`https://nodejs.org/dist/v${lock.nodeVersion}/${nodeFilename}`, artifact.nodeSha256, paths.downloads)
+      const nodeUpstream = `https://nodejs.org/dist/v${lock.nodeVersion}/${nodeFilename}`
+      const nodeArchive = await downloadPrimaryRuntimeAsset(runtimeAssetUrl(nodeUpstream,
+        process.env.DSH_DESKTOP_NODE_MIRROR?.trim() || undefined,
+        `v${lock.nodeVersion}/${nodeFilename}`), artifact.nodeSha256, paths.downloads)
       const unpackedNode = join(staging, 'node')
       mkdirSync(unpackedNode)
       if (target === 'win-x64') await extractZip(nodeArchive, { dir: unpackedNode })
