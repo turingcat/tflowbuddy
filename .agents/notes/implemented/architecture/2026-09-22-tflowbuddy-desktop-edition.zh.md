@@ -2,6 +2,8 @@
 
 Status: implemented
 
+[English](2026-09-22-tflowbuddy-desktop-edition.md) | 中文
+
 ## Problem
 
 `apps/desktop` 中的 Electron 桌面外壳呈现的是 DeepSeek 产品：窗口、菜单、关于面板、欢迎流程、图标、安装包与更新产物都带 DeepSeek Harness 身份，登录路径驱动的是 TFlow 账号持有者无法完成的 DeepSeek Platform 浏览器授权。TFlow 部署通过自己的 sub2api 面板签发模型密钥、通过 OpenAI 兼容网关提供模型，因此账号持有者既没有可用于登录的 DeepSeek 账号，也没有可粘贴的密钥。
@@ -39,6 +41,28 @@ DeepSeek Platform 账户视图及其 preload、`dshPlatform` 桥、设置页中�
 ### 语言
 
 欢迎窗口无论操作系统语言如何都以简体中文打开，因为产品读者是中文桌面用户且面板以中文应答。工作区保留共享语言偏好。
+
+### 本构建实现的面板契约
+
+面板是服务于 `https://tflow.online` 的 sub2api 部署，其契约是逐字段对照服务端源码核验的，而不是从已退役的 AIBuddy 实现推断。每个面板响应都是信封 `{ code, message?, reason?, data? }`，其中 `code === 0` 表示成功：
+
+| 用途 | 请求 | 读取字段 |
+|---|---|---|
+| 公开设置 | `GET /api/v1/settings/public` | `aliyun_captcha_*`、`api_base_url` |
+| 登录 | `POST /api/v1/auth/login` | 请求 `email`、`password`、`turnstile_token`；响应 `access_token`、`refresh_token?`、`requires_2fa`、`temp_token?`、`user_email_masked?` |
+| 二次验证 | `POST /api/v1/auth/login/2fa` | 请求 `temp_token`、`totp_code` |
+| 刷新 | `POST /api/v1/auth/refresh` | 请求 `refresh_token`；响应轮换令牌对 |
+| 账户 | `GET /api/v1/auth/me` | `email`、`balance` |
+| 模型密钥 | `GET /api/v1/keys`、`POST /api/v1/keys` | `name`、`status`、`key`、`group_id`；创建需 `Idempotency-Key` |
+| 分组 | `GET /api/v1/groups/available` | `id`、`name` |
+| 订阅 | `GET /api/v1/subscriptions/progress` | `subscription.group_id`、`progress.group_name`、`progress.daily|weekly|monthly.remaining_usd` |
+| 模型 | `GET {gateway}/v1/models` | OpenAI 兼容 `data[].id` |
+
+### 本阶段交付内容
+
+edition manifest、欢迎页登录流程、面板协议客户端、保险库密封的凭证记录、登录状态机、按窗口的 IPC 桥、中文欢迎界面、带目录与默认模型的 provider 路由、账户读取，以及账户界面。profile overlay 禁用了本产品无法服务的两行 base bundle 条目。
+
+构建过程中有两点值得保留：签发密钥时必须把所选分组一并持久化，因为账户读取需要按该分组向面板查询订阅，而下一次登录会复用该分组已有的密钥；provider 路由之下的 Host RPC 层从未对真实 Host 执行过，这正是被推迟的验证所针对的风险。
 
 ## Alternatives considered
 

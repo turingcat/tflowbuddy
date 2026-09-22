@@ -51,10 +51,15 @@ The package holds no session state and no credentials. The panel session, the mo
 <a id="model-experience"></a>
 ## Model Experience
 
-None, as account credentials affect HTTP authentication and never enter model prompts, Session logs, or tool results.
+None, as the account surface renders panel-reported balance and subscription and contributes nothing to a model request.
+
+#### KV Cache effect
+
+No model request prefix changes.
+
+## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
-## Known Limitations and Deferred Work
 
 - The surface reads the account once per mount and on demand. It does not poll: the shell's account read reaches the TFlow panel, and a background poll would spend panel requests on a value the user is not looking at.
 - Balance and subscription are both rendered only when the shell reports them. The panel's own notion of a group with no subscription is reported as "no subscription for this group" rather than as a zero balance.
@@ -65,4 +70,10 @@ None, as account credentials affect HTTP authentication and never enter model pr
 <a id="dev-note"></a>
 ### Dev Note
 
+### Dev Note
+
 The [desktop edition note](../../../.agents/notes/implemented/architecture/2026-09-22-tflowbuddy-desktop-edition.md) records why the account surface reads a shell bridge instead of the Host account Remote, and what the DeepSeek edition keeps.
+
+#### KV Cache effect
+
+No model request prefix changes.

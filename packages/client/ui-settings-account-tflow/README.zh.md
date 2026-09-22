@@ -7,15 +7,15 @@ kind: "package-reference"
 
 [English](README.md) | 中文
 
-## Summary
+## 概述
 
 `@deepseek-ai/dsh-client-ui-settings-account-tflow` 是 TFlow 发行版的账号界面。它展示已登录账号的显示名、美元余额，以及覆盖所选模型分组的订阅剩余额度，并链接到 TFlow 网站处理桌面端不负责的部分：充值、购买套餐与更换分组。
 
 该包只在 Electron 外壳加载的渲染进程中激活，通过外壳的账号桥识别。普通浏览器渲染进程，以及存在 Host 账号服务、使用自身账号界面的 DeepSeek 发行版，都不会在此注册任何内容。
 
-## Table of Contents
+## 目录
 
-- [使用本包](#use-this-package)
+- [使用此包](#use-this-package)
 - [理解实现](#understand-the-implementation)
 - [延伸阅读](#further-exploration)
 - [模型体验](#model-experience)
@@ -51,10 +51,15 @@ kind: "package-reference"
 <a id="model-experience"></a>
 ## 模型体验
 
-无。账号凭证只影响 HTTP 鉴权，从不进入模型提示词、会话日志或工具结果。
+无。账号界面只渲染面板上报的余额与订阅，不向模型请求贡献任何内容。
+
+#### KV Cache effect
+
+不改变模型请求前缀。
+
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
-## 已知限制与后续工作
 
 - 界面在挂载时读取一次账号，之后按需读取。它不做轮询：外壳的账号读取会打到 TFlow 面板，而后台轮询会为用户并未查看的数值持续消耗面板请求。
 - 余额与订阅只在外壳上报时才渲染。面板自身对「该分组没有订阅」的表达会显示为「当前分组没有订阅」，而不是零余额。
@@ -63,6 +68,12 @@ kind: "package-reference"
 - 本包在普通浏览器渲染进程的 roster 中渲染但贡献为空，注册测试覆盖了这一点。要在此桌面外壳之外复用它，需要一个形状相同的桥。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
+
+### 开发备注
 
 [桌面发行版决策记录](../../../.agents/notes/implemented/architecture/2026-09-22-tflowbuddy-desktop-edition.zh.md) 记录了为什么账号界面读取外壳桥而不是 Host 账号 Remote，以及 DeepSeek 发行版保留了什么。
+
+#### KV Cache effect
+
+不改变模型请求前缀。

@@ -1,6 +1,6 @@
-# TFlowBuddy real-machine verification checklist
+# TFlowBuddy 真机验证清单
 
-English | [中文](tflowbuddy-real-machine-verification.zh.md)
+[English](tflowbuddy-real-machine-verification.md) | 中文
 
 > Purpose: verify the TFlowBuddy sign-in-to-conversation path on a real machine. Every check on the implementation so far is at the unit level, and the Host RPC calls, the panel calls, and the profile-patch seeding have never executed against the real service.
 

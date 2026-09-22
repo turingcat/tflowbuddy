@@ -2,6 +2,8 @@
 
 Status: implemented
 
+English | [中文](2026-09-22-tflowbuddy-desktop-edition.zh.md)
+
 ## Problem
 
 The Electron desktop shell in `apps/desktop` presents the DeepSeek product: its window, menus, About panel, welcome flow, icons, installer, and update artifacts all carry DeepSeek Harness identity, and its sign-in path drives a DeepSeek Platform browser authorization that a TFlow account holder cannot complete. The TFlow deployment issues model keys through its own sub2api panel and serves models through an OpenAI-compatible gateway, so an account holder has no DeepSeek account to sign in with and no key to paste.
@@ -39,6 +41,28 @@ The DeepSeek Platform account view, its preload, the `dshPlatform` bridge, the S
 ### Language
 
 The welcome window opens in Simplified Chinese regardless of the operating-system language, because the product's readers are Chinese-speaking desktop users and the panel answers in Chinese. The workspace keeps the shared language preference.
+
+### The panel contract this build implements
+
+The panel is the sub2api deployment serving `https://tflow.online`, and its contract was verified field by field against the server source rather than inferred from the retired AIBuddy implementation. Every panel response is the envelope `{ code, message?, reason?, data? }` where `code === 0` is success:
+
+| Purpose | Request | Fields read |
+|---|---|---|
+| Public settings | `GET /api/v1/settings/public` | `aliyun_captcha_*`, `api_base_url` |
+| Sign in | `POST /api/v1/auth/login` | request `email`, `password`, `turnstile_token`; response `access_token`, `refresh_token?`, `requires_2fa`, `temp_token?`, `user_email_masked?` |
+| Second factor | `POST /api/v1/auth/login/2fa` | request `temp_token`, `totp_code` |
+| Refresh | `POST /api/v1/auth/refresh` | request `refresh_token`; response rotates the pair |
+| Account | `GET /api/v1/auth/me` | `email`, `balance` |
+| Model keys | `GET /api/v1/keys`, `POST /api/v1/keys` | `name`, `status`, `key`, `group_id`; create takes `Idempotency-Key` |
+| Groups | `GET /api/v1/groups/available` | `id`, `name` |
+| Subscription | `GET /api/v1/subscriptions/progress` | `subscription.group_id`, `progress.group_name`, `progress.daily|weekly|monthly.remaining_usd` |
+| Models | `GET {gateway}/v1/models` | OpenAI-compatible `data[].id` |
+
+### What shipped in this phase
+
+The edition manifest, the welcome sign-in flow, the panel protocol client, the vault-sealed credential record, the sign-in state machine, the per-window IPC bridge, the Chinese welcome surface, the provider route with its catalog and default model, the account read, and the account surface. The profile overlay disables the two base-bundle rows this product cannot serve.
+
+Two findings from building it are worth keeping: the provisioned group had to be persisted with the model key, because the account read asks the panel for the subscription covering that group and a later sign-in reuses the key that group owns; and the Host RPC layer beneath the provider route has never executed against a real Host, which is the risk the deferred verification addresses.
 
 ## Alternatives considered
 

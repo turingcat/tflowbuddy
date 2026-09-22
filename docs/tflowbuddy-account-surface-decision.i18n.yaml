@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/tflowbuddy-account-surface-decision.md
+tflowbuddy-account-surface-decision.md: 39de24de7971c4736eaf968614286339d86124e3
+tflowbuddy-account-surface-decision.zh.md: 5cfa25db8b39d391c3dc382171e1cb05640fe370

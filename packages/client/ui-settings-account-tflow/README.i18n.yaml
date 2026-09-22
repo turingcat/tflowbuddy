@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-account-tflow/README.md
-README.md: a8f63ce84b51f83aa708f77a59bdffdd55a14c6b
-README.zh.md: ffc156b3130915b08f9496aa9fbb49cf92c17022
+README.md: 9fa7a9dc9205602fb7e6637dca3ec3759b21997d
+README.zh.md: 48d11aa27542fc608b64fe7c760fef4f9dbe4f89

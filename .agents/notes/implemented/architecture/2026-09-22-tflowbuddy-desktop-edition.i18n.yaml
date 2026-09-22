@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-tflowbuddy-desktop-edition.md
-2026-09-22-tflowbuddy-desktop-edition.md: 33801f946407d3cbc6da5a8b093055cc4b025298
-2026-09-22-tflowbuddy-desktop-edition.zh.md: 9baad2c1dc2f6b963880a73d5332fb737eb50b9c
+2026-09-22-tflowbuddy-desktop-edition.md: c9380f440227f8f60186868978a8402340b306f9
+2026-09-22-tflowbuddy-desktop-edition.zh.md: 0ff527ad21867d9c64364013c13108825658185c

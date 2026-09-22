@@ -1,14 +1,16 @@
-# TFlowBuddy 下一步选择：TypeSafe 判断记录
+# TFlowBuddy next-step choice: TypeSafe judgment record
 
-> 日期：2026-09-22
-> 模型：`jev-latest`，请求时解析为 `jev-1.13.0`
-> 用途：为「先建工作区账户界面，还是先在真机验登录」提供结构化判断材料。最终决定由用户做出，模型判断不作为批准。
+English | [中文](tflowbuddy-account-surface-decision.zh.md)
 
-TypeSafe 只用于这一步的语义判断。接口字段、凭证密封、HTTP 状态分类和权限规则仍由普通代码与明确契约决定，不进入模型判断。
+> Date: 2026-09-22. Model: `jev-latest`, resolved to `jev-1.13.0` at request time.
 
-## 1. 状态（state）
+> Purpose: structured judgment material for the choice between building the workspace account surface first and verifying a real sign-in first. The user makes the decision; a model judgment is not an approval.
 
-传给模型的状态只包含产品事实，不含任何 token、模型密钥或面板响应原文。
+TypeSafe was used only for this one semantic judgment. Interface fields, credential sealing, HTTP status classification, and permission rules stay with ordinary code and explicit contracts and never enter a model judgment.
+
+## 1. State
+
+The state sent to the model carries product facts only — no token, no model key, and no raw panel response.
 
 ```json
 {
@@ -51,19 +53,19 @@ TypeSafe 只用于这一步的语义判断。接口字段、凭证密封、HTTP 
 }
 ```
 
-## 2. 判断问题
+## 2. Questions
 
-三个问题在同一请求中并行提出，彼此不可见对方的答案。
+Three questions were asked in one request, each evaluated independently and unable to see the others' answers.
 
-| id | 类型 | 问题 |
+| id | Type | Question |
 |---|---|---|
-| `next_step` | Choice | 当前最有利于这个产品的下一步是什么？选项：先真机验证再建界面 / 直接建工作区账户界面 / 一边验证一边并行建界面 |
-| `unverified_risk` | Score | 在 Host RPC、面板调用与 profile patch 播种全部从未对真实服务执行过的情况下，却有多个子系统建立在其上，这带来多大的产品风险？四级：最小 / 局部 / 复合 / 严重 |
-| `build_first_cost` | Score | 若现在先建账户界面，而之后的真机运行显示 Host RPC 层需要返工，多少账户界面工作量会被推翻？四级：无 / 小 / 中 / 大 |
+| `next_step` | Choice | Which next step best serves this product right now? Options: verify on a real machine first, build the workspace account surface now, or do both in parallel. |
+| `unverified_risk` | Score | With the Host RPC layer, the panel calls, and the profile-patch seeding never executed against the real service while several subsystems are built on top, how much product risk does that carry? Four levels: minimal, contained, compounding, severe. |
+| `build_first_cost` | Score | If the account surface is built first and the real run later shows the Host RPC layer needs rework, how much of that work is discarded? Four levels: none, small, moderate, large. |
 
-各 Score 的等级描述均写成可观察情形（例如「复合」= 多个后续功能建立在未验证层之上，底层一个错误假设会使上层工作失效且难以归因；「严重」= 错误假设会静默产生错误的用户可见数据或错误的安全结果，而不是可见失败）。
+Each Score level is written as an observable situation. "Compounding" reads: several later features are built on the unverified layer, so one wrong assumption near the bottom invalidates work layered above it and the failure is hard to attribute. "Severe" reads: a wrong assumption can silently produce wrong user-visible data or a wrong security outcome rather than a visible failure.
 
-## 3. 原始答案
+## 3. Raw answers
 
 ```json
 {
@@ -92,29 +94,43 @@ TypeSafe 只用于这一步的语义判断。接口字段、凭证密封、HTTP 
 }
 ```
 
-## 4. 代码如何消费这些答案
+## 4. How code consumes these answers
 
-规则是显式的，权重和阈值写在代码里，不由模型决定是否放行。
+The rules are explicit; weights and thresholds live in code and the model never decides whether to proceed.
 
-1. `unverified_risk` 落在「复合」及以上（score ≥ 2，其概率区间 2 与 3 合计 1.00）→ 在任何真机端到端运行之前，不再扩大建立在 Host RPC 层之上的用户可见功能。
-2. `next_step` 选中 `verify_then_build`，且置信度 0.94 高于 0.7 → 下一步是真机验证，而不是新建用户可见界面。
-3. `build_first_cost` 为 1.37、置信度仅 0.40 → **不**用它来论证「既然返工小就先建」。低置信度的优势证据不构成放行条件；它的作用是说明账户界面并非不可回收，因此可以安全地排在验证之后，而不是排在前面。
-4. 用户掌握最终改判权。模型输出只是判断材料，不构成对实现的批准。
+1. `unverified_risk` at "compounding" or above (score ≥ 2, with levels 2 and 3 together carrying probability 1.00) means no further user-visible capability is built on the Host RPC layer before a real end-to-end run.
+2. `next_step` chose `verify_then_build` at confidence 0.94, above 0.7, so the next step is real-machine verification rather than a new user-visible surface.
+3. `build_first_cost` scored 1.37 at confidence 0.40, so it is **not** used to argue the opposite case. Low-confidence favorable evidence is not a release condition; its role is to show the account surface is recoverable, which makes it safe to schedule after verification rather than before.
+4. The user holds the final override. Model output is decision material and never an approval to implement.
 
-## 5. 结论
+## 5. Conclusion
 
-先真机验证，再建工作区账户界面。这不是因为账户界面不值得做，而是因为账户界面是当前唯一建立在「Host RPC 层可用」这一未经执行假设之上的用户可见功能；在它之上继续叠加会让底层假设出错时的归因变难。
+TypeSafe and the code rules together concluded: verify on a real machine first, then build the workspace account surface. Not because the surface is not worth building, but because it was the only user-visible capability standing on the unexecuted assumption that the Host RPC layer works; layering more on top would have made a wrong assumption near the bottom harder to attribute.
 
-账户界面的工作应作为待办排期保留，而不是取消。
+The account surface work should be kept scheduled rather than cancelled.
 
-## 6. 复现
+## 6. User override (2026-09-22)
+
+The user decided to **finish the surface first, then verify**, overriding rules 1 and 2 of section 4.
+
+The user's stated reason: real-machine verification needs them present and needs the runtime prepared, which is expensive, and verifying everything in one batch is cheaper than verifying twice. That reason was invisible to the model — the `unverified_risk` state did not include the human cost of a verification round, so its risk judgment was missing a real constraint behind rules 1 and 2.
+
+What the override does and does not change:
+
+- Rules 3 and 4 of section 4 are unaffected and still hold. The account surface sits above the account read, so reworking the Host RPC layer would change only its data-source binding; the override's rework surface is therefore bounded.
+- The `unverified_risk` judgment still stands: verification must complete **before release**, and it must cover the new surface. It was deferred, not overturned.
+- The verification checklist therefore gained an item: confirm the account block shows the balance and subscription the panel reports, and that a failed read leaves the conversation usable.
+
+The override is not a rejection of the model's conclusion; it shows the model was missing a human-cost input. For any later choice of this shape, the state should carry the cost of a verification round, or the model will lean the same way again.
+
+## 7. Reproducing
 
 ```sh
-# .env 需提供 TYPESAFE_API_KEY
+# .env must provide TYPESAFE_API_KEY
 curl -sS https://api.typesafe.ai/v1/systemone \
   -H "Authorization: Bearer $TYPESAFE_API_KEY" \
   -H 'Content-Type: application/json' \
   -d @request.json
 ```
 
-参考文档：<https://docs.typesafe.ai/concepts/state.md>、<https://docs.typesafe.ai/primitives/choice.md>、<https://docs.typesafe.ai/primitives/score.md>、<https://docs.typesafe.ai/confidence.md>。
+Reference documentation: <https://docs.typesafe.ai/concepts/state.md>, <https://docs.typesafe.ai/primitives/choice.md>, <https://docs.typesafe.ai/primitives/score.md>, <https://docs.typesafe.ai/confidence.md>.
