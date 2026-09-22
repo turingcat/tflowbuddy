@@ -8,7 +8,9 @@
     "src/client",
     "src/welcome-api.ts",
     "src/locale.ts",
-    "src/edition.ts"
+    "src/edition.ts",
+    "src/preload-tflow.ts",
+    "src/tflow"
   ],
   "references": [
     {

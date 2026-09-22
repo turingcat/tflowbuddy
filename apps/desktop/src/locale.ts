@@ -31,34 +31,6 @@ export const en = {
   disableThirdPartyPlugins: 'Disable third-party plugins, back up profile patch, and restart',
   welcomeTitle: productName,
   welcomeBrand: productName,
-  welcomeTaglineBefore: 'Welcome to ',
-  welcomeTaglineBrand: productName,
-  welcomeTaglineAfter: '',
-  welcomeDescription: 'Build potential. Explore intelligence.',
-  welcomeAuthStarting: 'Opening sign in…',
-  welcomeAuthWaiting: 'Browser didn’t open automatically?',
-  welcomeAuthWaitingDescription: 'Copy the sign-in link and open it in your browser to sign in.',
-  welcomeAuthExchanging: 'Completing sign in…',
-  welcomeAuthExpired: 'Sign in timed out',
-  welcomeAuthExpiredDescription: 'Sign in again to continue',
-  welcomeAuthFailed: 'Could not complete sign in. Please try again.',
-  welcomeAuthCopyLink: 'Copy sign-in link',
-  welcomeAuthCopied: 'Copied',
-  welcomeAuthCopyFailed: 'Could not copy. Try again.',
-  welcomeAuthCancel: 'Cancel',
-  welcomeAuthRetry: 'Sign in again',
-  welcomeSignIn: 'Sign in',
-  welcomeApiKey: 'Add API Key',
-  welcomeKeyTitle: 'Add an API key to get started',
-  welcomeKeyDescription: `Configure official DeepSeek models to start using ${productName}`,
-  welcomeKeyPlaceholder: 'Enter API key',
-  welcomeKeySave: 'Save and continue',
-  welcomeKeyLater: 'Set up later',
-  welcomeKeyBack: 'Back to sign in',
-  welcomeKeyBlank: 'Enter an API key.',
-  welcomeKeyInvalid: 'Enter the API key itself, without quotes, spaces, or an environment-variable assignment.',
-  welcomeKeyFailed: 'Could not save the API key. Please try again.',
-  welcomeContinueFailed: 'Could not open the workspace. Please try again.',
   checkUpdatesMenu: 'Check for Updates…',
   reloadPageMenu: 'Reload Page',
   restartAppHostMenu: 'Restart App and Host',
@@ -126,6 +98,27 @@ export const en = {
   mandatoryCopyFailed: 'Copy failed. Select and copy the address below manually.',
   mandatoryAddress: 'Download address',
   mandatoryNotification: 'Return to the application to confirm installation and restart.',
+  welcomeSignInTitle: 'Sign in to TFlowBuddy',
+  welcomeSignInIntro: 'Sign in with your TFlow account to start chatting.',
+  welcomeCredentialsTitle: 'Account sign in',
+  welcomeCredentialsConnecting: 'Connecting to TFlow…',
+  welcomeCredentialsHint: 'Enter the email and password you registered with TFlow.',
+  welcomeEmail: 'Email',
+  welcomePassword: 'Password',
+  welcomeCaptcha: 'Verification code',
+  welcomeTotpTitle: 'Enter your verification code',
+  welcomeTotpHint: 'Enter the 6-digit code from your authenticator app.',
+  welcomeTotpHintFor: 'Enter the 6-digit code your authenticator app generated for {email}.',
+  welcomeCode: 'Verification code',
+  welcomeGroupTitle: 'Choose a model group',
+  welcomeGroupHint: 'Choose a group to create your model key. You can change it later on the TFlow website.',
+  welcomeSignedIn: 'Signed in',
+  welcomeOpeningWorkspace: 'Opening the workspace…',
+  welcomeSignIn: 'Sign in',
+  welcomeConfirm: 'Confirm',
+  welcomeRetry: 'Sign in again',
+  welcomeActionFailed: 'The action did not complete. Please try again.',
+
 } as const
 
 /** Every Desktop locale supplies the complete English key set. */
@@ -158,34 +151,6 @@ export const zh = {
   disableThirdPartyPlugins: '禁用第三方插件、备份 profile patch 并重启',
   welcomeTitle: productName,
   welcomeBrand: productName,
-  welcomeTaglineBefore: '欢迎使用 ',
-  welcomeTaglineBrand: productName,
-  welcomeTaglineAfter: '',
-  welcomeDescription: '组装无限可能，共探智能上限',
-  welcomeAuthStarting: '正在打开登录…',
-  welcomeAuthWaiting: '没有自动打开浏览器？',
-  welcomeAuthWaitingDescription: '复制登录链接，用浏览器手动打开完成登录',
-  welcomeAuthExchanging: '正在完成登录…',
-  welcomeAuthExpired: '登录已超时',
-  welcomeAuthExpiredDescription: '请重新登录后继续操作',
-  welcomeAuthFailed: '登录未完成，请重试。',
-  welcomeAuthCopyLink: '复制登录链接',
-  welcomeAuthCopied: '已复制',
-  welcomeAuthCopyFailed: '复制失败，请重试',
-  welcomeAuthCancel: '取消',
-  welcomeAuthRetry: '重新登录',
-  welcomeSignIn: '登录',
-  welcomeApiKey: '添加 API Key',
-  welcomeKeyTitle: '添加一个 API Key 开始使用',
-  welcomeKeyDescription: `配置 DeepSeek 官方模型，即可开始使用 ${productName}`,
-  welcomeKeyPlaceholder: '输入 API 密钥',
-  welcomeKeySave: '保存并继续',
-  welcomeKeyLater: '稍后配置',
-  welcomeKeyBack: '返回登录',
-  welcomeKeyBlank: '请输入 API 密钥。',
-  welcomeKeyInvalid: '请仅输入 API 密钥，不要包含引号、空格或环境变量赋值。',
-  welcomeKeyFailed: '无法保存 API 密钥，请重试。',
-  welcomeContinueFailed: '无法打开工作区，请重试。',
   checkUpdatesMenu: '检查更新…',
   reloadPageMenu: '刷新页面',
   restartAppHostMenu: '重启应用与 Host',
@@ -253,6 +218,27 @@ export const zh = {
   mandatoryCopyFailed: '复制失败，请手动选择下方地址复制。',
   mandatoryAddress: '下载地址',
   mandatoryNotification: '返回应用确认安装并重启。',
+  welcomeSignInTitle: '登录 TFlowBuddy',
+  welcomeSignInIntro: '使用你的 TFlow 账号登录，即可开始对话。',
+  welcomeCredentialsTitle: '账号登录',
+  welcomeCredentialsConnecting: '正在连接 TFlow 服务…',
+  welcomeCredentialsHint: '请输入注册 TFlow 时使用的邮箱和密码。',
+  welcomeEmail: '邮箱',
+  welcomePassword: '密码',
+  welcomeCaptcha: '验证码',
+  welcomeTotpTitle: '输入动态验证码',
+  welcomeTotpHint: '请输入身份验证器中的 6 位数字验证码。',
+  welcomeTotpHintFor: '请输入身份验证器中为 {email} 生成的 6 位数字验证码。',
+  welcomeCode: '动态验证码',
+  welcomeGroupTitle: '选择模型分组',
+  welcomeGroupHint: '选择一个分组来创建你的模型密钥，之后可以在 TFlow 网站上调整。',
+  welcomeSignedIn: '已登录',
+  welcomeOpeningWorkspace: '正在打开工作区…',
+  welcomeSignIn: '登录',
+  welcomeConfirm: '确认',
+  welcomeRetry: '重新登录',
+  welcomeActionFailed: '操作未完成，请重试。',
+
 } as const satisfies DesktopMessages
 
 /** Locale payload exposed to the Desktop-owned renderer. */
@@ -290,4 +276,29 @@ export function formatDesktopMessage(
   values: Readonly<Record<string, string>>,
 ): string {
   return message.replaceAll(/\{([^{}]+)\}/gu, (placeholder, key: string) => values[key] ?? placeholder)
+}
+
+/**
+ * Challenge locale for the native welcome window.
+ *
+ * The product ships for readers of Simplified Chinese, so the sign-in surface
+ * opens in Chinese regardless of the operating-system language. The workspace
+ * still follows {@link resolveDesktopStartupLocale}, and the language setting
+ * remains available there.
+ * @returns the welcome dictionary.
+ */
+export function resolveWelcomeLocale(): DesktopLocale {
+  return { id: 'zh-CN', messages: zh }
+}
+
+/**
+ * Whether one window locale argument names the dictionary this build ships for
+ * the sign-in surface. The preload refuses an argument it cannot vouch for, so a
+ * window created with a locale this build does not know fails loudly instead of
+ * rendering a partially translated page.
+ * @param value - value of the window's locale argument, or `undefined` when absent.
+ * @returns whether the argument matches the shipped welcome locale.
+ */
+export function isWelcomeLocale(value: string | undefined): boolean {
+  return value === resolveWelcomeLocale().id
 }

@@ -41,8 +41,12 @@ export interface TFlowSessionEffects {
   save(credentials: TFlowCredentials): Promise<void>
   /** Remove persisted credentials. */
   clear(): Promise<void>
-  /** Make the credentials available to the hosted model provider. */
-  apply(credentials: TFlowCredentials): Promise<void>
+  /**
+   * Make the credentials available to the hosted model provider.
+   * @param credentials - session the provider serves requests with.
+   * @param modelIds - models the gateway advertised for this key, in advertised order.
+   */
+  apply(credentials: TFlowCredentials, modelIds: readonly string[]): Promise<void>
   /** Stop serving the hosted model provider. */
   revoke(): Promise<void>
 }
@@ -95,6 +99,12 @@ export interface TFlowSignIn {
    */
   refresh(): Promise<TFlowAuthState>
   /**
+   * Abandon an outstanding attempt without touching stored credentials, so a
+   * user who backs out of a second sign-in keeps the session they already had.
+   * @returns the restored state.
+   */
+  abandon(): Promise<TFlowAuthState>
+  /**
    * Sign out and stop serving the provider.
    * @returns the signed-out state.
    */
@@ -138,6 +148,18 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
   const listeners = new Set<(state: TFlowAuthState) => void>()
   let current: TFlowAuthState = { kind: 'signed-out' }
   let pending: Pending | undefined
+  /**
+   * The session an attempt replaced. An attempt overwrites {@link current} at
+   * its first step, so abandoning one without this would strand a user who
+   * backed out of a second sign-in with no session at all.
+   */
+  let incumbent: TFlowAuthState = { kind: 'signed-out' }
+  /**
+   * Models the gateway advertised for the current key. A refresh replaces only
+   * the session, so it republishes this catalog rather than an empty one that
+   * would leave the route serving nothing.
+   */
+  let advertised: readonly string[] = []
 
   const publish = (state: TFlowAuthState): TFlowAuthState => {
     current = state
@@ -157,8 +179,13 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
     if (models.length === 0) throw new TFlowProtocolError('protocol', 'TFlow 网关未返回可用模型')
     const credentials: TFlowCredentials = { ...base, modelKey: modelKey.key }
     await options.effects.save(credentials)
-    await options.effects.apply(credentials)
+    // The advertised catalog travels with the key: the route declares the
+    // models the gateway serves, so a gateway that renames or retires one is
+    // republished at the next sign-in rather than drifting.
+    advertised = models.map(model => model.id)
+    await options.effects.apply(credentials, advertised)
     pending = undefined
+    incumbent = { kind: 'signed-out' }
     return publish({ kind: 'authenticated', credentials })
   }
 
@@ -184,6 +211,7 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
     async start(input) {
       try {
         const settings = await fetchPublicSettings(request)
+        incumbent = current.kind === 'authenticated' ? current : { kind: 'signed-out' }
         const step = await signIn(request, input)
         if (step.kind === 'totp-required') {
           // No access token exists until the code exchange; the challenge is
@@ -260,7 +288,7 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
         // Persist before applying: a provider serving a token the store has not
         // committed would survive a restart as a session that cannot refresh.
         await options.effects.save(credentials)
-        await options.effects.apply(credentials)
+        await options.effects.apply(credentials, advertised)
         return publish({ kind: 'authenticated', credentials })
       } catch (error) {
         const failure = failureState(error)
@@ -268,6 +296,7 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
         // place would keep failing every later request.
         if (error instanceof TFlowProtocolError && (error.kind === 'unauthorized' || error.kind === 'forbidden')) {
           pending = undefined
+          advertised = []
           await options.effects.clear()
           await options.effects.revoke()
           return publish(failure)
@@ -276,8 +305,17 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
       }
     },
 
+    async abandon() {
+      pending = undefined
+      // A signed-in session is what the user returns to; without one the
+      // attempt leaves nothing behind, and no stored record is touched either way.
+      return publish(incumbent)
+    },
+
     async signOut() {
       pending = undefined
+      incumbent = { kind: 'signed-out' }
+      advertised = []
       await options.effects.clear()
       await options.effects.revoke()
       return publish({ kind: 'signed-out' })

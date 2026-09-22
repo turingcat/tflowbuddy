@@ -338,3 +338,55 @@ body {
 .actions .welcome-loading { color: inherit; }
 
 .auth-waiting .copy-link:disabled { cursor: default; }
+
+/* TFlow sign-in, credential and group steps. */
+.key-form > .key-field + .key-field {
+  margin-top: 12px;
+}
+
+.key-heading p,
+.key-form > .key-error {
+  text-align: center;
+}
+
+.key-form > .key-error {
+  position: static;
+  margin: 12px 0 0;
+  color: var(--dsw-alias-label-primary);
+}
+
+.actions .key-error {
+  position: static;
+  margin: 0;
+  text-align: center;
+  color: var(--dsw-alias-label-primary);
+}
+
+.group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.group-list button {
+  height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-button-elevated-fill);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.group-list button:hover:not(:disabled) {
+  background: var(--dsw-alias-button-floating-hover);
+}
+
+.group-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}

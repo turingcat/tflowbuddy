@@ -48,16 +48,22 @@ function effects(overrides: Partial<TFlowSessionEffects> = {}): TFlowSessionEffe
   saved: TFlowCredentials[]
   cleared: number
   applied: TFlowCredentials[]
+  catalogs: Array<readonly string[]>
   revoked: number
 } {
   const recorded = {
     saved: [] as TFlowCredentials[],
     cleared: 0,
     applied: [] as TFlowCredentials[],
+    catalogs: [] as Array<readonly string[]>,
     revoked: 0,
     save: (credentials: TFlowCredentials) => { recorded.saved.push(credentials); return Promise.resolve() },
     clear: () => { recorded.cleared++; return Promise.resolve() },
-    apply: (credentials: TFlowCredentials) => { recorded.applied.push(credentials); return Promise.resolve() },
+    apply: (credentials: TFlowCredentials, modelIds: readonly string[]) => {
+      recorded.applied.push(credentials)
+      recorded.catalogs.push(modelIds)
+      return Promise.resolve()
+    },
     revoke: () => { recorded.revoked++; return Promise.resolve() },
   }
   return Object.assign(recorded, overrides)
@@ -120,6 +126,24 @@ describe('createTFlowSession', () => {
     })
     expect(record.saved).toEqual([(state as Extract<TFlowAuthState, { kind: 'authenticated' }>).credentials])
     expect(record.applied).toHaveLength(1)
+    expect(record.catalogs).toEqual([['glm-5']])
+  })
+
+  it('keeps serving the advertised catalog across a refresh', async () => {
+    const record = effects()
+    const session = createTFlowSession({
+      panelUrl: PANEL,
+      effects: record,
+      fetch: routed([
+        ...successRoutes({ data: [{ id: 'glm-5' }, { id: 'qwen3' }] }),
+        ['/api/v1/auth/refresh', panel({ access_token: 'next', refresh_token: 'next-refresh' })],
+      ]),
+      idempotencyKey: () => 'idem',
+    })
+    await session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
+    await session.selectGroup('7')
+    await session.refresh()
+    expect(record.catalogs).toEqual([['glm-5', 'qwen3'], ['glm-5', 'qwen3']])
   })
 
   it('never reports an authenticated session for an empty gateway catalog', async () => {
@@ -405,6 +429,56 @@ describe('refresh', () => {
     const restored = await session.restore(signedIn)
     expect(restored).toMatchObject({ kind: 'failed' })
     expect(record.cleared).toBe(0)
+  })
+})
+
+describe('abandon', () => {
+  const signedIn: TFlowCredentials = {
+    session: { accessToken: 'access', refreshToken: 'refresh' },
+    panelUrl: PANEL,
+    gatewayUrl: 'https://tflow.online/v1',
+    modelKey: 'sk-model',
+  }
+
+  it('reports a sign-out when no attempt or session exists', async () => {
+    const session = createTFlowSession({ panelUrl: PANEL, effects: effects() })
+    await expect(session.abandon()).resolves.toEqual({ kind: 'signed-out' })
+  })
+
+  it('returns to the session a second sign-in displaced, without clearing it', async () => {
+    const record = effects()
+    const session = createTFlowSession({
+      panelUrl: PANEL,
+      effects: record,
+      fetch: routed([
+        ['/api/v1/auth/refresh', panel({ access_token: 'next', refresh_token: 'next-refresh' })],
+        ['/api/v1/settings/public', panel(SETTINGS)],
+        ['/api/v1/auth/login', panel({ requires_2fa: true, temp_token: 'temp' })],
+      ]),
+    })
+    await session.restore(signedIn)
+    await session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
+    await expect(session.abandon()).resolves.toEqual({
+      kind: 'authenticated',
+      credentials: { ...signedIn, session: { accessToken: 'next', refreshToken: 'next-refresh' } },
+    })
+    expect(record.cleared).toBe(0)
+  })
+
+  it('retires the displaced session once a new one is provisioned', async () => {
+    const session = createTFlowSession({
+      panelUrl: PANEL,
+      effects: effects(),
+      fetch: routed([
+        ['/api/v1/auth/refresh', panel({ access_token: 'next', refresh_token: 'next-refresh' })],
+        ...successRoutes(),
+      ]),
+      idempotencyKey: () => 'idem',
+    })
+    await session.restore(signedIn)
+    await session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
+    await session.selectGroup('7')
+    await expect(session.abandon()).resolves.toEqual({ kind: 'signed-out' })
   })
 })
 

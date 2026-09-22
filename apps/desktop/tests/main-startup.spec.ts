@@ -1,4 +1,3 @@
-import type { AccountView } from '@deepseek-ai/dsh-deepseek-account/types'
 import { WINDOWS_TITLEBAR_HEIGHT } from '../src/windows-layout.ts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -132,6 +131,8 @@ const harness = await vi.hoisted(async () => {
     getPreferredSystemLanguages: () => ['en-US'],
     getVersion: () => '1.0.0',
     getAppPath: (): string => 'desktop-test-app',
+    setName: vi.fn(),
+    getPath: (): string => 'desktop-test-userdata',
     setAboutPanelOptions: vi.fn<(options: Electron.AboutPanelOptionsOptions) => void>(),
     requestSingleInstanceLock: () => true,
     setAsDefaultProtocolClient: vi.fn(),
@@ -146,18 +147,29 @@ const harness = await vi.hoisted(async () => {
       }
     }),
   })
-  let accountListener: ((state: AccountView) => void) | undefined
+  const credentialText = new Map<string, string>()
+  /** Host RPC calls the shell made, in order. */
+  const rpcCalls: Array<{ namespace: string, method: string, args: Record<string, unknown> }> = []
+  let localePreference: string | null = null
   const nativeTheme = { themeSource: 'system', shouldUseDarkColors: false }
   return {
     failWindow(error: Error) { windowFailure = error },
     windows, hosts, handlers, app, FakeWindow, FakeHost, powerMonitor, nativeTheme,
     menu, popup, socketHeaders: vi.fn(), updateCheck, updateDownload, updateInstall,
 
-    watchAccount: (listener: (state: AccountView) => void) => {
-      accountListener = listener
-      return () => { accountListener = undefined }
+    credentialText,
+    rpcCalls,
+    set localePreference(value: string | null) { localePreference = value },
+    /** Stand-in for the authenticated Host RPC connection. */
+    connectHostRpc: async () => async (request: { namespace: string, method: string, args: Record<string, unknown> }) => {
+      rpcCalls.push(request)
+      if (request.namespace === 'credentials') return undefined
+      if (request.namespace === 'llm-pi-ai') return { ns: 'llm-pi-ai', value: {}, revision: 1 }
+      return undefined
     },
-    publishAccount(state: AccountView) { accountListener?.(state) },
+    readLocalePreference: async () => localePreference,
+    applyTFlowRoute: vi.fn(async () => undefined),
+    revokeTFlowRoute: vi.fn(async () => undefined),
     ipcOn: vi.fn<(channel: string, listener: (event: { sender: unknown; senderFrame: unknown }, ...args: unknown[]) => void) => void>(),
     get updateState() { return updateState },
     set updateState(value: DesktopUpdateState) { updateState = value },
@@ -185,7 +197,9 @@ const harness = await vi.hoisted(async () => {
     set pluginsEnabled(value: boolean) { pluginsEnabled = value },
     set closeWindowsOnQuit(value: boolean) { closeWindowsOnQuit = value },
     reset() {
-      accountListener = undefined
+      credentialText.clear()
+      rpcCalls.length = 0
+      localePreference = null
       windows.length = 0; hosts.length = 0; handlers.clear(); app.removeAllListeners()
       powerMonitor.removeAllListeners()
       app.isPackaged = true
@@ -248,7 +262,26 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   }) }
 })
 vi.mock('../src/runtime-tree.ts', () => ({ readDesktopRuntime: () => ({ release: { version: '1.0.0' } }) }))
-vi.mock('../src/paths.ts', () => ({ resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }) }))
+vi.mock('../src/paths.ts', () => ({
+  resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }),
+  resolveTFlowCredentialsPath: () => 'desktop-test-userdata/tflow-credentials.json',
+}))
+vi.mock('../src/tflow/vault.ts', () => ({
+  createElectronVault: () => ({
+    available: () => true,
+    encrypt: (value: string) => Buffer.from(`sealed:${value}`, 'utf8'),
+    decrypt: (value: Buffer) => {
+      const text = value.toString('utf8')
+      if (!text.startsWith('sealed:')) throw new Error('not sealed by this platform')
+      return text.slice('sealed:'.length)
+    },
+  }),
+  createCredentialFiles: (filename: string) => ({
+    read: () => Promise.resolve(harness.credentialText.get(filename)),
+    write: (text: string) => { harness.credentialText.set(filename, text); return Promise.resolve() },
+    remove: () => { harness.credentialText.delete(filename); return Promise.resolve() },
+  }),
+}))
 vi.mock('../src/project-manager.ts', () => ({
   DesktopProjectManager: class {
     readonly applyRelease = harness.applyRelease
@@ -279,13 +312,11 @@ vi.mock('../src/update-coordinator.ts', () => ({ DesktopUpdateCoordinator: class
   readonly install = harness.updateInstall
   readonly dispose = vi.fn()
 } }))
-vi.mock('../src/welcome-backend.ts', () => ({
-  connectDesktopWelcome: async () => ({
-    readLocalePreference: async () => null,
-    read: async (): Promise<unknown> => (await harness.hosts.at(-1)!.fetch()).json() as Promise<unknown>,
-    save: async () => ({ ok: true }),
-    account: { watch: harness.watchAccount, state: async () => ({ status: 'signed-out', attempt: null }) },
-  }),
+vi.mock('../src/host-rpc.ts', () => ({
+  connectHostRpc: harness.connectHostRpc,
+  readLocalePreference: harness.readLocalePreference,
+  applyTFlowRoute: harness.applyTFlowRoute,
+  revokeTFlowRoute: harness.revokeTFlowRoute,
 }))
 
 function invoke(channel: string, origin = channel === DESKTOP_IPC.boot ? 'app' : 'shell', ...args: unknown[]): unknown {
@@ -1558,7 +1589,7 @@ describe('desktop main startup', () => {
     expect(harness.hosts).toHaveLength(1)
   })
 
-  it('keeps recovery visible when the backend fails during the welcome preference read', async () => {
+  it('keeps recovery visible when the backend fails during the language preference read', async () => {
     const preferences = Promise.withResolvers<Response>()
     await import('../src/main.ts')
     await harness.preparing.promise
@@ -1580,6 +1611,23 @@ describe('desktop main startup', () => {
     expect(harness.windows[0]!.show).not.toHaveBeenCalled()
   })
 
+  it('opens the sign-in window instead of the workspace when no credential is stored', async () => {
+    await import('../src/main.ts')
+    await harness.preparing.promise
+    harness.prepared.resolve()
+    await harness.hostStarted.promise
+    harness.hosts[0]!.ready.resolve()
+    await vi.waitFor(() => { expect(harness.windows).toHaveLength(2) })
+
+    const signInWindow = harness.windows[1]!
+    expect(signInWindow.urls).toEqual(['desktop-test-app/renderer/welcome.html'])
+    // The flow's channels exist only while that window owns them, and the
+    // workspace stayed on its loading document.
+    expect(harness.handlers.has('dsh-tflow:start')).toBe(true)
+    expect(harness.handlers.has('dsh-tflow:enter-workspace')).toBe(true)
+    expect(harness.windows[0]!.urls).toEqual(['dsh-app://app/'])
+  })
+
   it('waits for a pending child to exit on quit without late window navigation', async () => {
     await import('../src/main.ts')
     await harness.preparing.promise
@@ -1599,22 +1647,4 @@ describe('desktop main startup', () => {
     expect(window.urls).toEqual(['dsh-app://app/'])
     expect(harness.windows).toHaveLength(1)
   })
-})
-
-it.each(['failed', 'expired'] as const)('focuses DSH once when browser authorization becomes %s', async (phase) => {
-  await import('../src/main.ts')
-  await harness.preparing.promise
-  harness.prepared.resolve()
-  await harness.hostStarted.promise
-  harness.hosts[0]!.ready.resolve()
-  await Promise.resolve(invoke(DESKTOP_IPC.boot))
-  const window = harness.windows[0]!
-  window.focus.mockClear()
-  const state: AccountView = {
-    status: 'signed-out', links: { usageUrl: 'https://platform.deepseek.com/usage', topUpUrl: 'https://platform.deepseek.com/top_up' },
-    attempt: { id: 'test-failed-attempt' as NonNullable<AccountView['attempt']>['id'], phase },
-  }
-  harness.publishAccount(state)
-  harness.publishAccount(state)
-  expect(window.focus).toHaveBeenCalledTimes(1)
 })
