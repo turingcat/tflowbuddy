@@ -9,9 +9,10 @@
  * @module
  */
 
-import { fetchEntitlement, fetchPublicSettings, type TFlowFetch } from './protocol.ts'
-import type { TFlowCredentialStore, TFlowCredentials } from './credentials.ts'
+import { fetchEntitlement, fetchPublicSettings, fetchUsage, type TFlowFetch } from './protocol.ts'
+import type { TFlowCredentialStore, TFlowCredentials, TFlowGroupPreferenceStore } from './credentials.ts'
 import { createTFlowSession, type TFlowSessionEffects } from './session.ts'
+import type { TFlowUsage } from './types.ts'
 import { accountView, loginView, type TFlowAccountView, type TFlowLoginBootstrap, type TFlowLoginSettings, type TFlowLoginView, type TFlowStartInput } from './login-api.ts'
 
 /** Effects the shell supplies for the hosted provider route. */
@@ -30,6 +31,8 @@ export interface TFlowLoginBackendOptions {
   /** Panel origin serving the account API. */
   readonly panelUrl: string
   readonly credentials: TFlowCredentialStore
+  /** Non-secret group choice retained after sign-out. */
+  readonly groupPreference?: TFlowGroupPreferenceStore
   readonly route: TFlowProviderRoute
   /** Transport override; omitted uses the runtime fetch. */
   readonly fetch?: TFlowFetch
@@ -59,12 +62,21 @@ export interface TFlowLoginBackend {
    * @throws Error when the panel refuses or is unreachable, so the caller can offer a retry.
    */
   account(): Promise<TFlowAccountView | undefined>
+  /**
+   * Read what the panel reports the account has used.
+   * @returns today's and cumulative usage, or `undefined` when no session is signed in.
+   * @throws Error when the panel refuses or is unreachable, so the caller can offer a retry.
+   */
+  usage(): Promise<TFlowUsage | undefined>
   /** @param listener - view recipient. @returns subscription disposer. */
   subscribe(listener: (view: TFlowLoginView) => void): () => void
 }
 
 /** Longest panel field this shell forwards; the panel's own limits are lower. */
 const MAX_FIELD_LENGTH = 512
+
+/** Longest captcha proof this shell forwards; Aliyun slider proofs exceed `MAX_FIELD_LENGTH`. */
+const MAX_CAPTCHA_PROOF_LENGTH = 8192
 
 /**
  * Read one renderer-supplied text field, refusing anything the form could not
@@ -73,19 +85,20 @@ const MAX_FIELD_LENGTH = 512
  * @param value - value from the renderer.
  * @param field - field name for the failure message.
  * @param allowEmpty - whether an empty string is a legitimate value.
+ * @param maxLength - longest trimmed value accepted.
  * @returns the trimmed value.
  */
-function textField(value: unknown, field: string, allowEmpty = false): string {
+function textField(value: unknown, field: string, allowEmpty = false, maxLength = MAX_FIELD_LENGTH): string {
   if (typeof value !== 'string') throw new Error(`TFlow 登录：${field} 必须是文本`)
   const trimmed = value.trim()
   if (!allowEmpty && trimmed === '') throw new Error(`TFlow 登录：请填写${field}`)
-  if (trimmed.length > MAX_FIELD_LENGTH) throw new Error(`TFlow 登录：${field} 过长`)
+  if (trimmed.length > maxLength) throw new Error(`TFlow 登录：${field} 过长`)
   return trimmed
 }
 
 /** Read the captcha proof, which a deployment without a captcha legitimately leaves empty. */
 function captchaProof(value: unknown): string {
-  return textField(value, '验证码凭证', true)
+  return textField(value, '验证码凭证', true, MAX_CAPTCHA_PROOF_LENGTH)
 }
 
 /**
@@ -114,7 +127,7 @@ export function createTFlowLoginBackend(options: TFlowLoginBackendOptions): TFlo
     effects,
     ...options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey },
   })
-  session.subscribe(state => {
+  session.subscribe((state) => {
     const view = loginView(state)
     for (const listener of listeners) listener(view)
   })
@@ -157,6 +170,17 @@ export function createTFlowLoginBackend(options: TFlowLoginBackendOptions): TFlo
     await session.restore(stored.credentials)
   }
 
+  const selectGroup = async (groupId: string): Promise<TFlowLoginView> => {
+    const view = loginView(await session.selectGroup(textField(groupId, '分组')))
+    if (view.kind === 'authenticated') await options.groupPreference?.save(groupId)
+    return view
+  }
+  const continueWithRememberedGroup = async (view: TFlowLoginView): Promise<TFlowLoginView> => {
+    if (view.kind !== 'group' || options.groupPreference === undefined) return view
+    const remembered = await options.groupPreference.load()
+    if (remembered === undefined || !view.groups.some(group => group.id === remembered)) return view
+    return await selectGroup(remembered)
+  }
   return {
     state: () => loginView(session.state()),
 
@@ -168,19 +192,19 @@ export function createTFlowLoginBackend(options: TFlowLoginBackendOptions): TFlo
     },
 
     async start(input) {
-      return loginView(await session.start({
+      return await continueWithRememberedGroup(loginView(await session.start({
         email: textField(input?.email, '邮箱'),
         password: textField(input?.password, '密码'),
         captchaProof: captchaProof(input?.captchaProof),
-      }))
+      })))
     },
 
     async complete(code) {
-      return loginView(await session.complete(textField(code, '验证码')))
+      return await continueWithRememberedGroup(loginView(await session.complete(textField(code, '验证码'))))
     },
 
     async selectGroup(groupId) {
-      return loginView(await session.selectGroup(textField(groupId, '分组')))
+      return await selectGroup(groupId)
     },
 
     async signOut() {
@@ -198,6 +222,12 @@ export function createTFlowLoginBackend(options: TFlowLoginBackendOptions): TFlo
       if (state.kind !== 'authenticated') return undefined
       const { credentials } = state
       return accountView(await fetchEntitlement(requestOptions, credentials.session.accessToken, credentials.groupId))
+    },
+
+    async usage() {
+      const state = session.state()
+      if (state.kind !== 'authenticated') return undefined
+      return await fetchUsage(requestOptions, state.credentials.session.accessToken)
     },
 
     subscribe(listener) {

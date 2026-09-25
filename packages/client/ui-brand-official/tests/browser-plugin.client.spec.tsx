@@ -89,3 +89,8 @@ describe('official browser-brand plugin', () => {
     expect(mark.container.querySelector('svg')?.getAttribute('width')).toBe('24')
   })
 })
+it('renders the TFlowBuddy brand name', () => {
+  const name = render(<OfficialBrandName />)
+  expect(name.container.textContent).toBe('TFlowBuddy')
+  name.unmount()
+})

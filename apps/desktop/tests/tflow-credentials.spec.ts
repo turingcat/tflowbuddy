@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   TFLOW_CREDENTIAL_VERSION,
   createTFlowCredentialStore,
+  createTFlowGroupPreferenceStore,
   decodeTFlowCredentials,
   encodeTFlowCredentials,
   type TFlowCredentials,
@@ -179,5 +180,13 @@ describe('createTFlowCredentialStore', () => {
     const store = createTFlowCredentialStore(fakeVault(false), files)
     await expect(store.save(CREDENTIALS)).rejects.toThrow(/vault is unavailable/u)
     expect(files.writes).toEqual([])
+  })
+})
+describe('createTFlowGroupPreferenceStore', () => {
+  it('round-trips a remembered group independently of credentials', async () => {
+    const files = memoryFiles()
+    const store = createTFlowGroupPreferenceStore(files)
+    await store.save('7')
+    await expect(store.load()).resolves.toBe('7')
   })
 })

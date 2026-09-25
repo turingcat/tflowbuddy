@@ -173,6 +173,36 @@ export interface TFlowCredentialStore {
   clear(): Promise<void>
 }
 
+/** Non-secret group choice retained after account sign-out. */
+export interface TFlowGroupPreferenceStore {
+  /** @returns remembered group identifier, or `undefined` when none is stored. */
+  load(): Promise<string | undefined>
+  /** @param groupId - selected TFlow group identifier. */
+  save(groupId: string): Promise<void>
+}
+
+/** Build a small JSON store for the non-secret group choice. */
+export function createTFlowGroupPreferenceStore(files: TFlowVaultFiles): TFlowGroupPreferenceStore {
+  return {
+    async load() {
+      const text = await files.read()
+      if (text === undefined) return undefined
+      try {
+        const value: unknown = JSON.parse(text)
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+        const groupId = (value as Record<string, unknown>)['groupId']
+        return typeof groupId === 'string' && /^[0-9]+$/u.test(groupId) ? groupId : undefined
+      } catch {
+        return undefined
+      }
+    },
+    async save(groupId) {
+      if (!/^[0-9]+$/u.test(groupId)) throw new Error('TFlow group preference requires a numeric group identifier')
+      await files.write(`${JSON.stringify({ version: 1, groupId })}\n`)
+    },
+  }
+}
+
 /**
  * Build the credential store over one platform vault and one document location.
  * @param vault - platform secret vault.

@@ -45,7 +45,7 @@ function routed(routes: Array<[string, Response | (() => Response)]>): TFlowFetc
 }
 
 /** A credential store over one in-memory record. */
-function store(initial: TFlowCredentialLoad = { kind: 'absent' }): TFlowCredentialStore & { current: TFlowCredentialLoad, clears: number } {
+function store(initial: TFlowCredentialLoad = { kind: 'absent' }): TFlowCredentialStore & { current: TFlowCredentialLoad; clears: number } {
   const state = {
     current: initial,
     clears: 0,
@@ -166,6 +166,7 @@ describe('bootstrap', () => {
     const fetchImpl = routed([
       ['/api/v1/settings/public', () => panel(SETTINGS)],
       ['/api/v1/auth/refresh', () => panel({ access_token: 'next', refresh_token: 'next-refresh' })],
+      ['/v1/models', () => gateway({ data: [{ id: 'glm-5' }] })],
     ])
     const credentials = store({ kind: 'stored', credentials: CREDENTIALS })
     const providerRoute = route()
@@ -190,6 +191,14 @@ describe('bootstrap', () => {
 })
 
 describe('start', () => {
+  it('automatically applies a remembered group after a fresh sign-in', async () => {
+    const remembered = { load: async () => '7', save: async () => {} }
+    const context = backend({ groupPreference: remembered })
+    await context.backend.bootstrap()
+    await expect(context.backend.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })).resolves.toEqual({ kind: 'authenticated' })
+    expect(context.route.applied).toHaveLength(1)
+  })
+
   it('walks a successful sign-in through the group step', async () => {
     const context = backend()
     await context.backend.bootstrap()
@@ -202,7 +211,7 @@ describe('start', () => {
   it('notifies subscribers of every view', async () => {
     const context = backend()
     const seen: string[] = []
-    const stop = context.backend.subscribe(view => { seen.push(view.kind) })
+    const stop = context.backend.subscribe((view) => { seen.push(view.kind) })
     await context.backend.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
     stop()
     await context.backend.selectGroup('7')
@@ -238,9 +247,27 @@ describe('start', () => {
     ['a non-string password', { email: 'a@b.c', password: null, captchaProof: '' }, /密码/u],
     ['an overlong address', { email: `${'a'.repeat(600)}@b.c`, password: 'p', captchaProof: '' }, /过长/u],
     ['a non-string captcha proof', { email: 'a@b.c', password: 'p', captchaProof: 5 }, /验证码凭证/u],
+    ['an overlong captcha proof', { email: 'a@b.c', password: 'p', captchaProof: 'c'.repeat(8193) }, /验证码凭证 过长/u],
   ])('refuses %s before reaching the panel', async (_label, input, expected) => {
     const context = backend({ fetch: () => Promise.reject(new Error('the panel must not be reached')) })
     await expect(context.backend.start(input as never)).rejects.toThrow(expected)
+  })
+
+  it('forwards an Aliyun slider proof longer than the other fields allow', async () => {
+    // Aliyun popup proofs run past 512 characters; refusing them made every slider sign-in fail locally.
+    const proof = 'c'.repeat(3000)
+    const bodies: string[] = []
+    const forward = routed(signInRoutes())
+    const context = backend({
+      fetch: (url, init) => {
+        if (url.includes('/api/v1/auth/login') && typeof init?.body === 'string') bodies.push(init.body)
+        return forward(url, init)
+      },
+    })
+    await context.backend.bootstrap()
+    await expect(context.backend.start({ email: 'a@b.c', password: 'p', captchaProof: proof }))
+      .resolves.toMatchObject({ kind: 'group' })
+    expect(JSON.parse(bodies[0]!)).toMatchObject({ turnstile_token: proof })
   })
 
   it('accepts an absent captcha proof', async () => {
@@ -291,6 +318,7 @@ describe('cancel', () => {
     const fetchImpl = routed([
       ['/api/v1/settings/public', () => panel(SETTINGS)],
       ['/api/v1/auth/refresh', () => panel({ access_token: 'next', refresh_token: 'next-refresh' })],
+      ['/v1/models', () => gateway({ data: [{ id: 'glm-5' }] })],
       ['/api/v1/auth/login', () => panel({ requires_2fa: true, temp_token: 'temp' })],
       ['/api/v1/groups/available', () => panel([{ id: 7, name: '默认分组' }])],
     ])
@@ -362,6 +390,25 @@ describe('account', () => {
       ...signedInRoutes([]),
     ]))
     await expect(context.backend.account()).rejects.toThrow('登录已失效')
+  })
+
+  it('reports the usage of the signed-in session', async () => {
+    const context = await signedIn(routed([
+      ['/api/v1/usage/dashboard/stats', () => panel({
+        today_requests: 4, today_tokens: 1200, today_actual_cost: 0.4,
+        total_requests: 90, total_tokens: 56000, total_actual_cost: 9.6,
+      })],
+      ...signedInRoutes([]),
+    ]))
+    await expect(context.backend.usage()).resolves.toEqual({
+      today: { requests: 4, tokens: 1200, cost: 0.4 },
+      total: { requests: 90, tokens: 56000, cost: 9.6 },
+    })
+  })
+
+  it('reports no usage while no session is signed in', async () => {
+    const context = backend()
+    await expect(context.backend.usage()).resolves.toBeUndefined()
   })
 })
 

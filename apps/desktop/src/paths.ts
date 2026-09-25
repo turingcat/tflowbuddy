@@ -36,3 +36,8 @@ export function resolveDesktopPaths(dshHome: string = resolveDshHome()): Desktop
 export function resolveTFlowCredentialsPath(userData: string): string {
   return join(userData, 'tflow-credentials.json')
 }
+
+/** @param userData - Electron user-data directory. @returns group preference path. */
+export function resolveTFlowGroupPreferencePath(userData: string): string {
+  return join(userData, 'tflow-group-preference.json')
+}

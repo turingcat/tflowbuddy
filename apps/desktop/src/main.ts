@@ -34,9 +34,9 @@ import { DesktopFatalRecovery } from './fatal-recovery.ts'
 import { openWelcomeWindow } from './welcome-window.ts'
 import { connectHostRpc, readLocalePreference as readLocalePreferenceRpc, applyTFlowRoute, revokeTFlowRoute, type HostInvoke } from './host-rpc.ts'
 import { createTFlowLoginBackend, type TFlowLoginBackend } from './tflow/login-backend.ts'
-import { createTFlowCredentialStore } from './tflow/credentials.ts'
+import { createTFlowCredentialStore, createTFlowGroupPreferenceStore } from './tflow/credentials.ts'
 import { createCredentialFiles, createElectronVault } from './tflow/vault.ts'
-import { resolveTFlowCredentialsPath } from './paths.ts'
+import { resolveTFlowCredentialsPath, resolveTFlowGroupPreferencePath } from './paths.ts'
 import { DesktopUpdateJournal } from './update-journal.ts'
 import { DesktopUpdatePreparationError } from './update-error.ts'
 import { DesktopUpdateSchedule, resolveDesktopUpdateScheduleConfig } from './update-schedule.ts'
@@ -330,6 +330,7 @@ async function main(): Promise<void> {
         tflow = createTFlowLoginBackend({
           panelUrl: desktopEdition.siteUrl,
           credentials: createTFlowCredentialStore(createElectronVault(), createCredentialFiles(resolveTFlowCredentialsPath(app.getPath('userData')))),
+          groupPreference: createTFlowGroupPreferenceStore(createCredentialFiles(resolveTFlowGroupPreferencePath(app.getPath('userData')))),
           route: {
             apply: (credentials, modelIds) => applyTFlowRoute(invoke, credentials, modelIds),
             revoke: () => revokeTFlowRoute(invoke),
@@ -564,6 +565,19 @@ async function main(): Promise<void> {
     // A failure is reported as null rather than as a rejected invoke: the
     // account block shows a retry, and the session itself is unaffected.
     return await tflow.account().catch(() => null)
+  })
+  ipcMain.handle(DESKTOP_IPC.tflowUsage, async (event) => {
+    assertProductSender(event)
+    if (tflow === undefined) return null
+    // Same null-on-failure rule as the account read above.
+    return await tflow.usage().catch(() => null)
+  })
+  ipcMain.handle(DESKTOP_IPC.tflowSignOut, async (event) => {
+    assertProductSender(event)
+    if (tflow === undefined) return
+    await tflow.signOut()
+    enteredWorkspace = false
+    await showWelcome()
   })
   ipcMain.handle(DESKTOP_IPC.updatesStatus, (event) => {
     assertProductSender(event)
