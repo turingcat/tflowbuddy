@@ -48,6 +48,8 @@ export interface TFlowAccountInjected {
   refresh: () => Promise<void>
   /** Open the TFlow account site in the operating system browser. */
   manage: () => void
+  /** Sign out and return to the TFlow login window. */
+  signOut: () => Promise<void>
 }
 
 /** Composed props for the TFlow account section. */

@@ -9,7 +9,7 @@ import { developmentLauncher } from '../scripts/development-app.ts'
 it.skipIf(process.platform === 'win32')('passes literal workspace paths and cold-start settings to Electron', () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-development-app-'))
   onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
-  const bundle = join(root, "Harness ' $(false).app")
+  const bundle = join(root, "TFlowBuddy ' $(false).app")
   const binary = join(bundle, 'Contents', 'MacOS', 'Electron')
   mkdirSync(join(bundle, 'Contents', 'MacOS'), { recursive: true })
   writeFileSync(binary, '#!/bin/sh\nprintf "%s\\n" "$DSH_HOME" "$DSH_DESKTOP_DEV_APP" "$DSH_DESKTOP_OPEN_DEVTOOLS" "$@"\n', { mode: 0o755 })

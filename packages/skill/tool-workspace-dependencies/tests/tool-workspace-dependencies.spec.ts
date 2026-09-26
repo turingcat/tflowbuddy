@@ -221,6 +221,66 @@ it('loads the real tool through Cordis, exposes payload paths in place, and unre
   }
 })
 
+/** Boot the real tool through Cordis with one configuration, and run it once. */
+async function executeConfigured(directory: string, config: Record<string, string>) {
+  const ctx = new Context()
+  try {
+    ctx.baseUrl = pathToFileURL(directory).href + '/'
+    await ctx.plugin(Loader)
+    ctx.loader.builtins.include = Include
+    Object.assign(ctx.loader.builtins, {
+      agents: AgentRegistry, systemPrompt: SystemPrompt, tools: ToolRuntime, dependencies: workspaceDependencies,
+    })
+    const file = join(directory, 'cordis.yml')
+    const lines = Object.entries(config).map(([key, value]) => `    ${key}: ${JSON.stringify(value)}`).join('\n')
+    await writeFile(file, `- name: cordis:agents\n- name: cordis:systemPrompt\n- name: cordis:tools\n- name: cordis:dependencies\n  config:\n${lines}\n`)
+    await ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(file).href } })
+    await ctx.loader.await()
+    for (const entry of ctx.loader.entries()) await entry.fiber?.await()
+    return await ctx.tools.execute({ signal: new AbortController().signal, name: 'load_workspace_dependencies', arguments: {}, callId: ToolCallId('call') })
+  } finally {
+    await ctx.fiber.dispose()
+  }
+}
+
+/** A Python-only payload plus a carrier launcher and pnpm script, as Desktop ships them. */
+async function pythonOnlyWithCarrier() {
+  const { source, directory } = await fixture()
+  const manifest: PrimaryRuntimeManifest = {
+    desktopVersion: '1.0.0', platform: process.platform, arch: process.arch, python: '3.12.14', pythonPackages: { 'python-docx': '1.2.0' },
+  }
+  await writeFile(join(source, 'runtime.json'), JSON.stringify(manifest))
+  const node = join(directory, 'launcher', 'node')
+  const pnpm = join(directory, 'pnpm', 'bin', 'pnpm.mjs')
+  for (const path of [node, pnpm]) {
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, 'entry')
+  }
+  return { source, directory, manifest, node, pnpm }
+}
+
+it('returns the carrier Node.js and pnpm beside a Python-only payload, so the agent still gets both paths', async () => {
+  const { source, directory, manifest, node, pnpm } = await pythonOnlyWithCarrier()
+  const result = await executeConfigured(directory, { source, node, pnpm })
+  expect(result.isError).toBe(false)
+  expect(result.content).toEqual([{ type: 'text', text: JSON.stringify({ ...workspaceDependencyPaths(source, manifest), node, pnpm }, undefined, 2) }])
+})
+
+it('refuses a carrier Node.js when the payload ships its own, rather than choosing one silently', async () => {
+  const { source, directory } = await fixture()
+  const node = join(directory, 'launcher', 'node')
+  await mkdir(dirname(node), { recursive: true })
+  await writeFile(node, 'entry')
+  const result = await executeConfigured(directory, { source, node })
+  expect(result.isError).toBe(true)
+  expect(JSON.stringify(result.content)).toContain('both supply Node.js')
+})
+
+it('refuses to load with a pnpm entry but no Node.js to run it', async () => {
+  const { source, directory, pnpm } = await pythonOnlyWithCarrier()
+  await expect(executeConfigured(directory, { source, pnpm })).rejects.toThrow('pnpm requires node')
+})
+
 it('uses a payload in place without copying and tolerates a payload without Node.js or pnpm', async () => {
   const { source, directory } = await fixture()
   const manifest: PrimaryRuntimeManifest = {

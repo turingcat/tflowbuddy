@@ -56,6 +56,20 @@ export type TFlowEntitlement =
   | { readonly kind: 'balance'; readonly account: TFlowAccount }
   | { readonly kind: 'subscription'; readonly account: TFlowAccount; readonly groupName: string; readonly remaining: TFlowRemaining }
 
+/** Request, token, and charged totals for one usage period. */
+export interface TFlowUsagePeriod {
+  readonly requests: number
+  readonly tokens: number
+  /** Amount the panel deducted, in USD as the panel reports it. */
+  readonly cost: number
+}
+
+/** Usage the panel reports for the signed-in user. */
+export interface TFlowUsage {
+  readonly today: TFlowUsagePeriod
+  readonly total: TFlowUsagePeriod
+}
+
 /** A TFlow model key together with the group it is bound to. */
 export interface TFlowModelKey {
   readonly key: string

@@ -2,7 +2,7 @@
 
 English | [中文](tflowbuddy-real-machine-verification.zh.md)
 
-> Purpose: verify the TFlowBuddy sign-in-to-conversation path on a real machine. Every check on the implementation so far is at the unit level, and the Host RPC calls, the panel calls, and the profile-patch seeding have never executed against the real service.
+> Purpose: verify the TFlowBuddy sign-in-to-conversation path on a real machine. Every check on the implementation so far is at the unit level, and the Host RPC calls, the panel calls, and the the edition overlay have never executed against the real service.
 
 > Basis: the account-surface decision record, which put this checklist before any further user-visible surface was built on the unverified layer.
 
@@ -61,7 +61,7 @@ After a successful sign-in, confirm:
 1. The model picker lists **the models the TFlow gateway returned**, and no DeepSeek model such as `deepseek-flash`.
 2. A new conversation starts on the first model without a manual choice.
 
-When the first does not hold, check whether `~/.dsh/profiles/desktop/cordis.patch.yml` carries `disabled: true` for `deepseek-account` and `llm-deepseek`. That edition overlay is new and has never been read by a real boot.
+When the first does not hold, check that the installed runtime ships `@deepseek-ai/dsh-desktop-host/edition.cordis.patch.yml`; the Host applies it after every profile patch to disable `ui-settings-account`, `deepseek-account`, and `llm-deepseek`.
 
 ## 4. Conversation
 

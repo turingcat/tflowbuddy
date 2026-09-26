@@ -25,7 +25,7 @@ Deployments that ship their own script runtimes (Desktop's primary runtime, or a
 <a id="use-this-package"></a>
 ## Use this package
 
-Mount the plugin beside the tool registry with the payload directory. Configuration validation requires a nonempty `source` and rejects empty `root` values before activation; both paths must be absolute. The bundled Office skills (`@deepseek-ai/dsh-skill-office`) reference this tool by name for their default interpreter.
+Mount the plugin beside the tool registry with the payload directory. Configuration validation requires a nonempty `source` and rejects empty `root`, `node`, and `pnpm` values before activation; every path must be absolute, and `pnpm` requires `node`. The bundled Office skills (`@deepseek-ai/dsh-skill-office`) reference this tool by name for their default interpreter.
 
 ### Minimal configuration
 
@@ -39,6 +39,8 @@ Mount the plugin beside the tool registry with the payload directory. Configurat
 |---|---|---|
 | `source` | required | Absolute payload directory carrying `runtime.json` and `dependencies/`. |
 | `root` | unset | Absolute installation directory under the Harness home. Set: the payload is copied there on the first call and reused while `runtime.json` is unchanged. Unset: the payload is validated and used in place; nothing is copied. |
+| `node` | unset | Absolute Node.js executable the carrier supplies instead of the payload; Desktop passes its Electron launcher. The first call fails when the payload also ships Node.js. |
+| `pnpm` | unset | Absolute pnpm entry script run through `node`. |
 
 ### Payload layout
 
@@ -48,7 +50,7 @@ The packaged `sdk` profile uses its bundled Python and Office skills by default;
 
 ### Build a carrier payload
 
-From a repository checkout with dependencies installed, `CI=true pnpm run prepare:primary-runtime --target linux-x64 --output /tmp/dsh-office` writes `primary-runtime/` and `office-skills/`. The shared [download lock](../../../scripts/primary-runtime/lock.json) also covers `linux-arm64`, `mac-arm64`, `mac-x64`, and `win-x64`. `--python-only` omits Node.js and pnpm; `--cache` selects the hash-verified archive cache. The entry executes interpreter and Office read/write checks only for a native target. Cross-target builds require those checks on the target host before deployment.
+From a repository checkout with dependencies installed, `CI=true pnpm run prepare:primary-runtime --target linux-x64 --output /tmp/dsh-office` writes `primary-runtime/` and `office-skills/`. The shared [download lock](../../../scripts/primary-runtime/lock.json) also covers `linux-arm64`, `mac-arm64`, `mac-x64`, and `win-x64`. Payloads carry Python only; `--cache` selects the hash-verified archive cache. The entry executes interpreter and Office read/write checks only for a native target. Cross-target builds require those checks on the target host before deployment.
 
 A container can copy both directories into an immutable image layer and set `DSH_PRIMARY_RUNTIME` to the absolute `primary-runtime/` path. The SDK queries that payload in place. Desktop uses the same builder and retains its Harness-home installation and signing checks.
 
@@ -100,7 +102,7 @@ Prefix-stable while the tool definition and visibility are unchanged.
 
 #### What the model sees
 
-One JSON object with absolute `python` and `pythonPackages` paths, `pythonDistributions` from `runtime.json`, and `node`, `nodePackages`, and `pnpm` when the payload declares them. Repeated calls return the same object.
+One JSON object with absolute `python` and `pythonPackages` paths, `pythonDistributions` from `runtime.json`, `node` and `pnpm` when the carrier configures them, and `node`, `nodePackages`, and `pnpm` when a payload manifest declares them. Repeated calls return the same object.
 
 #### Token effect
 

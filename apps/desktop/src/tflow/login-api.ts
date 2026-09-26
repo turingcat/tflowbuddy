@@ -10,6 +10,14 @@
 import type { TFlowAuthState } from './session.ts'
 import type { TFlowEntitlement, TFlowGroup } from './types.ts'
 
+/** Alibaba Cloud captcha SDK globals in the isolated welcome renderer. */
+declare global {
+  interface Window {
+    initAliyunCaptcha?: (options: { SceneId: string; prefix: string; mode: 'popup'; element: string; button: string; captchaVerifyCallback: (proof: string) => { captchaResult: boolean }; onBizResultCallback: () => void; getInstance: () => void; slideStyle: { width: number; height: number } }) => void
+    AliyunCaptchaConfig?: { region: 'cn' | 'sgp'; prefix: string }
+  }
+}
+
 /** Private welcome channels owning the TFlow flow. */
 export const TFLOW_IPC = {
   state: 'dsh-tflow:state',
@@ -49,7 +57,7 @@ export interface TFlowAccountView {
   /** Panel balance in USD, as the panel reports it. */
   readonly balance: number
   /** Present when a subscription covers the selected group. */
-  readonly subscription?: { readonly groupName: string, readonly remaining: TFlowRemainingView }
+  readonly subscription?: { readonly groupName: string; readonly remaining: TFlowRemainingView }
 }
 
 /**
@@ -94,10 +102,10 @@ export interface TFlowLoginBootstrap {
 export function accountView(entitlement: TFlowEntitlement): TFlowAccountView {
   return entitlement.kind === 'subscription'
     ? {
-        displayName: entitlement.account.displayName,
-        balance: entitlement.account.balance,
-        subscription: { groupName: entitlement.groupName, remaining: entitlement.remaining },
-      }
+      displayName: entitlement.account.displayName,
+      balance: entitlement.account.balance,
+      subscription: { groupName: entitlement.groupName, remaining: entitlement.remaining },
+    }
     : { displayName: entitlement.account.displayName, balance: entitlement.account.balance }
 }
 

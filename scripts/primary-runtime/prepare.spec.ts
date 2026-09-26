@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { zipSync } from 'fflate'
 import { expect, it } from 'vitest'
-import { downloadPrimaryRuntimeAsset, prepareOfficeSkillAssets, primaryRuntimePayloadDigest, smokePrimaryRuntime, unpackPrimaryRuntimeWheel } from './prepare.ts'
+import { compactInterpreter, downloadPrimaryRuntimeAsset, prepareOfficeSkillAssets, primaryRuntimePayloadDigest, smokePrimaryRuntime, unpackPrimaryRuntimeWheel } from './prepare.ts'
 import lock from './lock.json' with { type: 'json' }
 
 it('covers every SDK wheel target with the shared interpreter lock', () => {
@@ -32,18 +32,17 @@ it.each(Object.entries(lock.targets))('records every locked wheel distribution a
 it('keeps a target payload identity independent of other target archives', () => {
   const changed = structuredClone(lock)
   changed.targets['win-x64'].wheels[0]!.sha256 = 'a'.repeat(64)
-  expect(primaryRuntimePayloadDigest('mac-arm64', changed, '11.7.0')).toBe(primaryRuntimePayloadDigest('mac-arm64', lock, '11.7.0'))
-  expect(primaryRuntimePayloadDigest('win-x64', changed, '11.7.0')).not.toBe(primaryRuntimePayloadDigest('win-x64', lock, '11.7.0'))
+  expect(primaryRuntimePayloadDigest('mac-arm64', changed, true)).toBe(primaryRuntimePayloadDigest('mac-arm64', lock, true))
+  expect(primaryRuntimePayloadDigest('win-x64', changed, true)).not.toBe(primaryRuntimePayloadDigest('win-x64', lock, true))
 })
 
-it('invalidates payload identity for shared wheels, package versions and package-manager changes', () => {
+it('invalidates payload identity for shared wheels and package versions', () => {
   const wheel = structuredClone(lock), distribution = structuredClone(lock)
   wheel.wheels[0]!.sha256 = 'a'.repeat(64)
   distribution.pythonPackages['python-docx'] = '1.2.1'
-  const original = primaryRuntimePayloadDigest('mac-arm64', lock, '11.7.0')
-  expect(primaryRuntimePayloadDigest('mac-arm64', wheel, '11.7.0')).not.toBe(original)
-  expect(primaryRuntimePayloadDigest('mac-arm64', distribution, '11.7.0')).not.toBe(original)
-  expect(primaryRuntimePayloadDigest('mac-arm64', lock, '11.7.1')).not.toBe(original)
+  const original = primaryRuntimePayloadDigest('mac-arm64', lock, true)
+  expect(primaryRuntimePayloadDigest('mac-arm64', wheel, true)).not.toBe(original)
+  expect(primaryRuntimePayloadDigest('mac-arm64', distribution, true)).not.toBe(original)
 })
 
 it('reports missing distribution metadata before trying to execute a stale native payload', async () => {
@@ -51,7 +50,7 @@ it('reports missing distribution metadata before trying to execute a stale nativ
   try {
     await writeFile(join(root, 'runtime.json'), JSON.stringify({ desktopVersion: '1.0.0', platform: process.platform, arch: process.arch,
       components: { python: '3.12.14', numpy: '2.3.5', pandas: '3.0.1' } }))
-    expect(() => { smokePrimaryRuntime(root) }).toThrow('missing Python distribution versions; prepare the payload')
+    expect(() => { smokePrimaryRuntime(root, { compact: false }) }).toThrow('missing Python distribution versions; prepare the payload')
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
@@ -137,11 +136,66 @@ it('copies complete Office resources outside the application archive and removes
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-it('gives Python-only payloads a distinct identity', () => {
-  expect(primaryRuntimePayloadDigest('linux-x64', lock, undefined)).not.toBe(primaryRuntimePayloadDigest('linux-x64', lock, '11.7.0'))
+it('gives compact payloads a distinct identity, so an installed complete payload is replaced', () => {
+  expect(primaryRuntimePayloadDigest('mac-arm64', lock, false)).not.toBe(primaryRuntimePayloadDigest('mac-arm64', lock, true))
 })
 
-it('keeps carrier pnpm versions aligned with the shared payload build', () => {
+/** Create each relative file (or `name -> target` link) under root. */
+async function tree(root: string, entries: readonly string[]): Promise<void> {
+  for (const entry of entries) {
+    const [path, target] = entry.split(' -> ') as [string, string | undefined]
+    await mkdir(join(root, path, '..'), { recursive: true })
+    if (target === undefined) await writeFile(join(root, path), path)
+    else await symlink(target, join(root, path))
+  }
+}
+
+it('keeps one Unix interpreter under the name the path query returns and drops pip, IDLE, Tk, and ensurepip', async () => {
+  const python = await mkdtemp(join(tmpdir(), 'compact-unix-'))
+  try {
+    await tree(python, [
+      'bin/python3.12', 'bin/python -> python3.12', 'bin/python3 -> python3.12', 'bin/pip3', 'bin/idle3 -> idle3.12', 'bin/idle3.12',
+      'lib/libpython3.12.dylib', 'lib/libtcl9.0.dylib', 'lib/libtcl9tk9.0.dylib', 'lib/tcl9.0/init.tcl', 'lib/tk9.0/tk.tcl', 'lib/itcl4.3.8/a', 'lib/thread3.0.6/a',
+      'lib/python3.12/os.py', 'lib/python3.12/turtle.py', 'lib/python3.12/tkinter/__init__.py', 'lib/python3.12/idlelib/a.py',
+      'lib/python3.12/turtledemo/a.py', 'lib/python3.12/ensurepip/a.py', 'lib/python3.12/lib-dynload/_tkinter.cpython-312-darwin.so',
+      'lib/python3.12/lib-dynload/_ssl.cpython-312-darwin.so', 'lib/python3.12/site-packages/pip/a.py', 'lib/python3.12/site-packages/pip-26.2.1.dist-info/METADATA',
+    ])
+    compactInterpreter(python, 'mac-arm64')
+    expect(await readdir(join(python, 'bin'))).toEqual(['python3'])
+    // The versioned executable takes the name; a dangling link would fail the materializing copy.
+    expect(await readFile(join(python, 'bin/python3'), 'utf8')).toBe('bin/python3.12')
+    expect((await readdir(join(python, 'lib'))).sort()).toEqual(['libpython3.12.dylib', 'python3.12'])
+    expect((await readdir(join(python, 'lib/python3.12'))).sort()).toEqual(['lib-dynload', 'os.py', 'site-packages'])
+    expect(await readdir(join(python, 'lib/python3.12/lib-dynload'))).toEqual(['_ssl.cpython-312-darwin.so'])
+    expect(await readdir(join(python, 'lib/python3.12/site-packages'))).toEqual([])
+  } finally { await rm(python, { recursive: true, force: true }) }
+})
+
+it('drops pip, IDLE, Tk, and ensurepip from the Windows layout without touching the interpreter', async () => {
+  const python = await mkdtemp(join(tmpdir(), 'compact-windows-'))
+  try {
+    await tree(python, [
+      'python.exe', 'pythonw.exe', 'python312.dll', 'tcl/tcl8.6/init.tcl', 'DLLs/_tkinter.pyd', 'DLLs/tcl86t.dll', 'DLLs/tk86t.dll', 'DLLs/_ssl.pyd',
+      'Lib/os.py', 'Lib/tkinter/__init__.py', 'Lib/idlelib/a.py', 'Lib/turtledemo/a.py', 'Lib/turtle.py', 'Lib/ensurepip/a.py',
+      'Lib/site-packages/pip/a.py', 'Lib/site-packages/pip-26.2.1.dist-info/METADATA', 'Lib/site-packages/README.txt',
+    ])
+    compactInterpreter(python, 'win-x64')
+    expect((await readdir(python)).sort()).toEqual(['DLLs', 'Lib', 'python.exe', 'python312.dll', 'pythonw.exe'])
+    expect(await readdir(join(python, 'DLLs'))).toEqual(['_ssl.pyd'])
+    expect((await readdir(join(python, 'Lib'))).sort()).toEqual(['os.py', 'site-packages'])
+    expect(await readdir(join(python, 'Lib/site-packages'))).toEqual(['README.txt'])
+  } finally { await rm(python, { recursive: true, force: true }) }
+})
+
+it('fails the build when a compact rule matches nothing, since the locked archive layout changed', async () => {
+  const python = await mkdtemp(join(tmpdir(), 'compact-drift-'))
+  try {
+    await tree(python, ['python.exe', 'tcl/a', 'DLLs/_tkinter.pyd', 'Lib/tkinter/a.py', 'Lib/site-packages/README.txt'])
+    expect(() => { compactInterpreter(python, 'win-x64') }).toThrow(/matched nothing in .*site-packages/u)
+  } finally { await rm(python, { recursive: true, force: true }) }
+})
+
+it('keeps the Desktop pnpm version aligned with the repository package manager', () => {
   const root = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
     packageManager: string
     devDependencies: { pnpm: string }

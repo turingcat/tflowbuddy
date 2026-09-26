@@ -69,6 +69,9 @@ function effects(overrides: Partial<TFlowSessionEffects> = {}): TFlowSessionEffe
   return Object.assign(recorded, overrides)
 }
 
+/** The gateway catalog a stored key re-reads when a session is restored. */
+const CATALOG: [string, Response] = ['/v1/models', gateway({ data: [{ id: 'glm-5' }, { id: 'qwen3' }] })]
+
 const SIGNED_IN_GROUPS = panel([{ id: 7, name: '默认分组' }])
 const ONE_KEY = panel({ items: [{ name: 'TFlowBuddy', status: 'active', key: 'sk-model', group_id: 7 }] })
 
@@ -331,7 +334,7 @@ describe('restore', () => {
     const session = createTFlowSession({
       panelUrl: PANEL,
       effects: record,
-      fetch: routed([['/api/v1/auth/refresh', panel({ access_token: 'new-access', refresh_token: 'new-refresh' })]]),
+      fetch: routed([CATALOG, ['/api/v1/auth/refresh', panel({ access_token: 'new-access', refresh_token: 'new-refresh' })]]),
     })
     await expect(session.restore(stored)).resolves.toEqual({
       kind: 'authenticated',
@@ -339,6 +342,20 @@ describe('restore', () => {
     })
     expect(record.saved[0]?.session.accessToken).toBe('new-access')
     expect(record.applied).toHaveLength(1)
+    // A new process has no catalog of its own; the provider refuses a route that lists no models.
+    expect(record.catalogs).toEqual([['glm-5', 'qwen3']])
+  })
+
+  it('reports a failure without applying a route when the gateway lists no models for the stored key', async () => {
+    const record = effects()
+    const session = createTFlowSession({
+      panelUrl: PANEL,
+      effects: record,
+      fetch: routed([['/v1/models', gateway({ data: [] })], ['/api/v1/auth/refresh', panel({ access_token: 'a', refresh_token: 'r' })]]),
+    })
+    await expect(session.restore(stored)).resolves.toMatchObject({ kind: 'failed', message: 'TFlow 网关未返回可用模型' })
+    expect(record.applied).toEqual([])
+    expect(record.cleared).toBe(0)
   })
 
   it('signs out a stored record that carries no refresh grant', async () => {
@@ -354,7 +371,7 @@ describe('restore', () => {
     const session = createTFlowSession({
       panelUrl: PANEL,
       effects: record,
-      fetch: routed([['/api/v1/auth/refresh', new Response(JSON.stringify({ code: 401, message: '登录已失效' }), { status: 401 })]]),
+      fetch: routed([CATALOG, ['/api/v1/auth/refresh', new Response(JSON.stringify({ code: 401, message: '登录已失效' }), { status: 401 })]]),
     })
     await expect(session.restore(stored)).resolves.toMatchObject({ kind: 'failed', retryable: true })
     expect(record.cleared).toBe(1)
@@ -366,7 +383,7 @@ describe('restore', () => {
     const session = createTFlowSession({
       panelUrl: PANEL,
       effects: record,
-      fetch: routed([['/api/v1/auth/refresh', () => { throw new Error('offline') }]]),
+      fetch: routed([CATALOG, ['/api/v1/auth/refresh', () => { throw new Error('offline') }]]),
     })
     await expect(session.restore(stored)).resolves.toMatchObject({ kind: 'failed', retryable: true })
     expect(record.cleared).toBe(0)
@@ -401,7 +418,7 @@ describe('refresh', () => {
     const session = createTFlowSession({
       panelUrl: PANEL,
       effects: record,
-      fetch: routed([['/api/v1/auth/refresh', panel({ access_token: 'next-access', refresh_token: 'next-refresh' })]]),
+      fetch: routed([CATALOG, ['/api/v1/auth/refresh', panel({ access_token: 'next-access', refresh_token: 'next-refresh' })]]),
     })
     await session.restore(signedIn)
     await expect(session.refresh()).resolves.toMatchObject({
@@ -414,7 +431,7 @@ describe('refresh', () => {
     const session = createTFlowSession({
       panelUrl: PANEL,
       effects: effects(),
-      fetch: routed([['/api/v1/auth/refresh', panel({ access_token: 'next-access' })]]),
+      fetch: routed([CATALOG, ['/api/v1/auth/refresh', panel({ access_token: 'next-access' })]]),
     })
     await session.restore(signedIn)
     await expect(session.refresh()).resolves.toMatchObject({
@@ -454,6 +471,7 @@ describe('abandon', () => {
       panelUrl: PANEL,
       effects: record,
       fetch: routed([
+        CATALOG,
         ['/api/v1/auth/refresh', panel({ access_token: 'next', refresh_token: 'next-refresh' })],
         ['/api/v1/settings/public', panel(SETTINGS)],
         ['/api/v1/auth/login', panel({ requires_2fa: true, temp_token: 'temp' })],
@@ -473,6 +491,7 @@ describe('abandon', () => {
       panelUrl: PANEL,
       effects: effects(),
       fetch: routed([
+        CATALOG,
         ['/api/v1/auth/refresh', panel({ access_token: 'next', refresh_token: 'next-refresh' })],
         ...successRoutes(),
       ]),

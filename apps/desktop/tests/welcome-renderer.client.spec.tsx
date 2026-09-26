@@ -14,7 +14,11 @@ const messages = resolveWelcomeLocale().messages
 /** A panel with the captcha enabled, as tflow.online serves it. */
 const SETTINGS = { captchaEnabled: true, captchaSceneId: 'scene', captchaPrefix: 'prefix', captchaRegion: 'cn' }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  delete window.initAliyunCaptcha
+  document.querySelectorAll('script[src*="aliyunCaptcha"]').forEach((node) =>{  node.remove() })
+})
 
 interface Mounted {
   api: TFlowWelcomeApi
@@ -33,6 +37,7 @@ interface Mounted {
  */
 function mount(boot: TFlowLoginBootstrap = { state: { kind: 'signed-out' }, settings: SETTINGS }): Mounted {
   cleanup()
+  window.initAliyunCaptcha = vi.fn()
   let publish: (view: TFlowLoginView) => void = () => {}
   const enterWorkspace = vi.fn(() => Promise.resolve())
   const api: TFlowWelcomeApi = {
@@ -56,7 +61,7 @@ function mount(boot: TFlowLoginBootstrap = { state: { kind: 'signed-out' }, sett
     type: (id, value) => { fireEvent.change(document.querySelector(id)!, { target: { value } }) },
     visibleCopy: () => [
       document.title,
-      document.querySelector('img')!.alt,
+      document.querySelector('img')?.getAttribute('alt') ?? '',
       ...[...document.querySelectorAll('h1, p, label')].filter(node => node.closest('[hidden]') === null)
         .map(node => node.textContent),
       ...[...document.querySelectorAll('button')].filter(node => node.closest('[hidden]') === null)
@@ -76,7 +81,19 @@ describe('desktop welcome presentation', () => {
   it('renders the credential step with the product copy', async () => {
     const view = mount()
     await settled()
-    expect(view.visibleCopy()).toMatchFileSnapshot('./expected/welcome/zh-CN-credentials.expected.txt')
+    await expect(view.visibleCopy()).toMatchFileSnapshot('./expected/welcome/zh-CN-credentials.expected.txt')
+  })
+
+  it('matches the AIBuddy credential layout with TFlowBuddy branding', async () => {
+    mount()
+    await settled()
+    expect(document.querySelector('.auth-card')).not.toBeNull()
+    expect(document.querySelector('.auth-card h1')?.textContent).toBe('TFlowBuddy')
+    expect(document.querySelector('label[for="tflow-email"]')?.textContent).toBe('邮箱')
+    expect(document.querySelector('label[for="tflow-password"]')?.textContent).toBe('密码')
+    expect(document.querySelector('[data-aliyun-captcha]')?.textContent).toContain('点击完成人机验证')
+    expect(document.querySelector('#retry')).toBeNull()
+    expect(document.querySelector('.tagline')).toBeNull()
   })
 
   it('renders no credential, key, or panel payload into the document', async () => {
@@ -100,7 +117,67 @@ describe('desktop welcome presentation', () => {
     view.type('#tflow-email', 'alice@example.com')
     expect(view.button('#sign-in').disabled).toBe(true)
     view.type('#tflow-password', 'secret')
+    await act(async () => { fireEvent.click(view.button('[data-aliyun-captcha]')); await Promise.resolve() })
+    const options = vi.mocked(window.initAliyunCaptcha!).mock.calls.at(-1)![0]
+    await act(async () => { options.captchaVerifyCallback('proof'); await Promise.resolve() })
     expect(view.button('#sign-in').disabled).toBe(false)
+  })
+
+  it('opens the Aliyun slider and submits its proof instead of typed captcha text', async () => {
+    const view = mount()
+    await settled()
+    expect(document.querySelector('#tflow-captcha')).toBeNull()
+    view.type('#tflow-email', 'alice@example.com')
+    view.type('#tflow-password', 'secret')
+    await act(async () => { fireEvent.click(view.button('[data-aliyun-captcha]')); await Promise.resolve() })
+    expect(window.initAliyunCaptcha).toHaveBeenCalledWith(expect.objectContaining({ SceneId: 'scene', prefix: 'prefix', mode: 'popup' }))
+    const options = vi.mocked(window.initAliyunCaptcha!).mock.calls.at(-1)![0]
+    await act(async () => { options.captchaVerifyCallback('slider-proof'); await Promise.resolve() })
+    await act(async () => { fireEvent.click(view.button('#sign-in')); await Promise.resolve() })
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
+    expect(view.api.start).toHaveBeenCalledWith({ email: 'alice@example.com', password: 'secret', captchaProof: 'slider-proof' })
+  })
+
+  it('keeps the slider popup the SDK mounted while the user types credentials', async () => {
+    const view = mount()
+    vi.mocked(window.initAliyunCaptcha!).mockImplementation(() => {
+      const popup = document.createElement('div')
+      popup.id = 'aliyunCaptcha-window-popup'
+      document.body.appendChild(popup)
+    })
+    await settled()
+    view.type('#tflow-email', 'alice@example.com')
+    view.type('#tflow-password', 'secret')
+    // The SDK initializes once and later shows this node; removing it leaves the slider unable to open.
+    expect(window.initAliyunCaptcha).toHaveBeenCalledOnce()
+    expect(document.getElementById('aliyunCaptcha-window-popup')).not.toBeNull()
+  })
+
+  it('does not require a slider when the panel disables captcha', async () => {
+    const view = mount({ state: { kind: 'signed-out' }, settings: { ...SETTINGS, captchaEnabled: false } })
+    await settled()
+    expect(document.querySelector('[data-aliyun-captcha]')).toBeNull()
+    view.type('#tflow-email', 'alice@example.com')
+    view.type('#tflow-password', 'secret')
+    await act(async () => { fireEvent.click(view.button('#sign-in')); await Promise.resolve() })
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
+    expect(view.api.start).toHaveBeenCalledWith({ email: 'alice@example.com', password: 'secret', captchaProof: '' })
+  })
+
+  it('does not submit credentials when the slider cannot return a proof', async () => {
+    const view = mount()
+    await settled()
+    view.type('#tflow-email', 'alice@example.com')
+    view.type('#tflow-password', 'secret')
+    vi.useFakeTimers()
+    try {
+      await act(async () => { fireEvent.click(view.button('#sign-in')); await Promise.resolve() })
+      await act(async () => { await vi.advanceTimersByTimeAsync(8_100) })
+    } finally {
+      vi.useRealTimers()
+    }
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
+    expect(view.api.start).not.toHaveBeenCalled()
   })
 
   it('submits the entered fields once and never submits twice', async () => {
@@ -108,11 +185,14 @@ describe('desktop welcome presentation', () => {
     await settled()
     view.type('#tflow-email', '  alice@example.com  ')
     view.type('#tflow-password', 'secret')
-    view.type('#tflow-captcha', ' proof ')
+    await act(async () => { vi.mocked(window.initAliyunCaptcha!).mock.calls.at(-1)![0].captchaVerifyCallback('proof'); await Promise.resolve() })
     view.api.start = vi.fn(() => new Promise<TFlowLoginView>(() => {}))
     fireEvent.click(view.button('#sign-in'))
     fireEvent.click(view.button('#sign-in'))
+    await settled()
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
     expect(view.api.start).toHaveBeenCalledOnce()
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
     expect(view.api.start).toHaveBeenCalledWith({ email: 'alice@example.com', password: 'secret', captchaProof: 'proof' })
   })
 
@@ -121,6 +201,7 @@ describe('desktop welcome presentation', () => {
     await settled()
     view.type('#tflow-email', 'alice@example.com')
     view.type('#tflow-password', 'secret')
+    await act(async () => { vi.mocked(window.initAliyunCaptcha!).mock.calls.at(-1)![0].captchaVerifyCallback('proof'); await Promise.resolve() })
     view.api.start = vi.fn(() => Promise.resolve<TFlowLoginView>({ kind: 'totp' }))
     await act(async () => { fireEvent.click(view.button('#sign-in')); await Promise.resolve() })
     expect(view.field('#tflow-password').value).toBe('')
@@ -132,12 +213,13 @@ describe('desktop welcome presentation', () => {
     await settled()
     act(() => { view.publish({ kind: 'totp', maskedEmail: 'a***@b.c' }) })
     expect(document.body.textContent).toContain('a***@b.c')
-    expect(view.button('#sign-in').textContent).toBe(messages.welcomeConfirm)
-    expect(view.button('#sign-in').disabled).toBe(true)
+    expect(view.button('#sign-in-totp').textContent).toBe(messages.welcomeConfirm)
+    expect(view.button('#sign-in-totp').disabled).toBe(true)
     view.type('#tflow-code', '123456')
     expect(view.button('#sign-in').disabled).toBe(false)
     view.api.complete = vi.fn(() => Promise.resolve<TFlowLoginView>({ kind: 'signed-out' }))
-    await act(async () => { fireEvent.click(view.button('#sign-in')); await Promise.resolve() })
+    await act(async () => { fireEvent.click(view.button('#sign-in-totp')); await Promise.resolve() })
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
     expect(view.api.complete).toHaveBeenCalledWith('123456')
   })
 
@@ -149,6 +231,7 @@ describe('desktop welcome presentation', () => {
     expect(groups.map(node => node.textContent)).toEqual(['默认分组', '订阅套餐'])
     view.api.selectGroup = vi.fn(() => Promise.resolve<TFlowLoginView>({ kind: 'authenticated' }))
     await act(async () => { fireEvent.click(groups[1]!); await Promise.resolve() })
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- mocked IPC method has no this binding.
     expect(view.api.selectGroup).toHaveBeenCalledWith('9')
   })
 
@@ -160,22 +243,21 @@ describe('desktop welcome presentation', () => {
     expect(view.enterWorkspace).toHaveBeenCalled()
   })
 
-  it('offers a retry only for a recoverable failure and returns to the form', async () => {
+  it('keeps recoverable failure on the login form without a re-login button', async () => {
     const view = mount()
     await settled()
     act(() => { view.publish({ kind: 'failure', message: '账号已停用', retryable: false }) })
-    expect(view.button('#retry').hidden).toBe(true)
+    expect(view.button('#retry')).toBeNull()
 
     act(() => { view.publish({ kind: 'failure', message: '邮箱或密码错误', retryable: true }) })
-    expect(view.button('#retry').hidden).toBe(false)
-    act(() => { fireEvent.click(view.button('#retry')) })
-    expect(view.button('#retry').hidden).toBe(true)
-    expect(document.body.textContent).toContain(messages.welcomeCredentialsTitle)
+    expect(view.button('#retry')).toBeNull()
+    expect(document.body.textContent).toContain('邮箱或密码错误')
   })
 
   it('reports a bridge failure instead of leaving the form silent', async () => {
     const view = mount()
     await settled()
+    await act(async () => { vi.mocked(window.initAliyunCaptcha!).mock.calls.at(-1)![0].captchaVerifyCallback('proof'); await Promise.resolve() })
     view.api.start = vi.fn(() => Promise.reject(new Error('bridge gone')))
     await act(async () => {
       view.type('#tflow-email', 'alice@example.com')
@@ -195,6 +277,8 @@ describe('desktop welcome presentation', () => {
 
   it('keeps shell copy in the dictionaries and denies network access', () => {
     expect(html).toContain("default-src 'none'")
-    expect(html).not.toMatch(/https?:\/\/(?!www\.w3\.org)/u)
+    // The captcha entry script pulls its challenge bundles from sibling
+    // alicdn hosts, so a policy naming only the entry host blocks the slider.
+    expect(html).toContain("script-src 'self' 'unsafe-inline' https://*.alicdn.com")
   })
 })

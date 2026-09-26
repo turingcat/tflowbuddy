@@ -7,6 +7,7 @@ import {
   type TFlowAccountInjected,
   type TFlowAccountSnapshot,
 } from '../src/client/AccountSection.tsx'
+import { TFlowUsageSection, type TFlowUsageSnapshot } from '../src/client/UsageSection.tsx'
 import { TFlowAccountMenu } from '../src/client/AccountMenu.tsx'
 import { en, zh, type TFlowAccountKey } from '../src/client/locales.ts'
 
@@ -24,7 +25,7 @@ function copySeat(copy: typeof en | typeof zh) {
 
 /** Mount the section over one published snapshot. */
 function mountSection(snapshot: TFlowAccountSnapshot, copy: typeof en | typeof zh = en, refresh = vi.fn(() => Promise.resolve())) {
-  const operations: TFlowAccountInjected = { hooks: { account: source(snapshot) }, refresh, manage: vi.fn() }
+  const operations: TFlowAccountInjected = { hooks: { account: source(snapshot) }, refresh, manage: vi.fn(), signOut: vi.fn() }
   const observable = source(snapshot)
   // The section consumes no slot-derived share beyond the inject face, so the
   // stub supplies the three seats it reads and no framework seats.
@@ -116,21 +117,27 @@ it('offers settings and the account site from the launcher, and shows the accoun
     hooks: { account: source({ status: 'ready', account: { displayName: 'alice', balance: 1 } }) },
     refresh: vi.fn(() => Promise.resolve()),
     manage,
+    signOut: vi.fn(),
   }
   const observable = source({ status: 'ready', account: { displayName: 'alice', balance: 1 } })
   const props = {
-    refresh: operations.refresh, manage: operations.manage,
+    refresh: operations.refresh, manage: operations.manage, signOut: operations.signOut,
     useAccount: (selector: (value: TFlowAccountSnapshot) => unknown) => selector(observable.getSnapshot()),
     wide: true, openSettings, openOnboarding: () => {}, t: copySeat(zh),
   } as unknown as Parameters<typeof TFlowAccountMenu>[0]
   render(<TFlowAccountMenu {...props} />)
+  // The sidebar is the first account surface on screen; without this read the name never replaces the fallback.
+  expect(operations.refresh).toHaveBeenCalledOnce()
   expect(screen.getByRole('button', { name: zh.nav }).textContent).toBe('alice')
   fireEvent.click(screen.getByRole('button', { name: zh.nav }))
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([zh.settings, zh.manage])
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([zh.settings, zh.usage, zh.manage, zh.signOut])
   await expect(`${screen.getByRole('menu').textContent}\n`).toMatchFileSnapshot('./expected/menu-zh.txt')
   fireEvent.click(screen.getByRole('menuitem', { name: zh.settings }))
   expect(openSettings).toHaveBeenCalledOnce()
   expect(manage).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: zh.nav }))
+  fireEvent.click(screen.getByRole('menuitem', { name: zh.signOut }))
+  expect(operations.signOut).toHaveBeenCalledOnce()
 })
 
 it('opens the account site from the launcher and hides the name in the collapsed rail', async () => {
@@ -139,6 +146,7 @@ it('opens the account site from the launcher and hides the name in the collapsed
     hooks: { account: source({ status: 'signed-out' }) },
     refresh: vi.fn(() => Promise.resolve()),
     manage,
+    signOut: vi.fn(),
   }
   const observable = source({ status: 'signed-out' })
   const props = {
@@ -155,4 +163,44 @@ it('opens the account site from the launcher and hides the name in the collapsed
 
 it('ships the same key set in both languages', () => {
   expect(Object.keys(zh).sort()).toEqual(Object.keys(en).sort())
+})
+
+/** Mount the usage section over one published snapshot. */
+function mountUsage(snapshot: TFlowUsageSnapshot, refresh = vi.fn(() => Promise.resolve())) {
+  // Same seat subset as `mountSection`: the section reads no framework seats.
+  const props = {
+    close: () => {},
+    refresh,
+    useUsage: (selector: (value: TFlowUsageSnapshot) => unknown) => selector(snapshot),
+    t: copySeat(zh),
+  } as unknown as Parameters<typeof TFlowUsageSection>[0]
+  render(<TFlowUsageSection {...props} />)
+  return refresh
+}
+
+it('reports today and all-time usage with the amount the panel deducted', async () => {
+  mountUsage({
+    status: 'ready',
+    usage: { today: { requests: 4, tokens: 1200, cost: 0.0042 }, total: { requests: 90, tokens: 56000, cost: 9.6 } },
+  })
+  expect(screen.getByRole('region').getAttribute('aria-label')).toBe(zh.usage)
+  const today = screen.getByRole('group', { name: zh.today })
+  // A sub-cent charge stays visible instead of rounding to $0.00.
+  expect(today.textContent).toContain('$0.0042')
+  expect(screen.getByRole('group', { name: zh.total }).textContent).toContain('56,000')
+  await expect(`${screen.getByRole('region').textContent}\n`).toMatchFileSnapshot('./expected/usage-zh.txt')
+})
+
+it('asks for a sign-in rather than showing zero usage', () => {
+  mountUsage({ status: 'signed-out' })
+  expect(screen.getByText(zh.usageSignInRequired)).toBeTruthy()
+  expect(document.body.textContent).not.toContain('$')
+})
+
+it('offers a retry after a failed usage read', async () => {
+  const refresh = mountUsage({ status: 'failed' })
+  await act(async () => { await Promise.resolve() })
+  expect(screen.getByText(zh.usageFailed)).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: zh.retry })); await Promise.resolve() })
+  expect(refresh).toHaveBeenCalledTimes(2)
 })

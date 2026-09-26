@@ -57,17 +57,20 @@ export function createElectronBuilderConfig(
     throw new Error('desktop package: DSH_DESKTOP_UNSIGNED must be 0 or 1')
   }
   const unsigned = env.DSH_DESKTOP_UNSIGNED === '1'
-  if (unsigned && resolvedPlatform !== 'win32') throw new Error('desktop package: unsigned builds require Windows')
   const packagesMacOS = targetPlatform === 'darwin' || (targetPlatform === undefined && hostPlatform === 'darwin')
   const packagesWindows = resolvedPlatform === 'win32'
   if (resolvedPlatform === 'win32') installWindowsDirectoryInstaller()
-  const macOSSigning = packagesMacOS ? resolveMacOSSigningEnvironment(env) : undefined
-  if (packagesMacOS) resolveMacOSNotarizationEnvironment(env)
+  // A local unsigned build has no Developer ID and no Apple credentials, so it
+  // ad-hoc signs instead; a release still resolves and verifies the real identity.
+  const macOSSigning = packagesMacOS && !unsigned ? resolveMacOSSigningEnvironment(env) : undefined
+  if (packagesMacOS && !unsigned) resolveMacOSNotarizationEnvironment(env)
   const buildPaths = desktopTargetBuildPaths(resolveDesktopBuildTarget(env, hostPlatform, hostArch))
   let primaryRuntimeDestination
   let dshDestination
   let windowsCode = []
   const unpack = ['**/*.{node,dylib,dll,so,exe}', '**/*.so.*', '**/spawn-helper', '**/@vscode/ripgrep-*/bin/rg',
+    '**/node_modules/@deepseek-ai/libreoffice-kit/**',
+    '**/node_modules/{fontkit,fflate,saxes,xmlchars,@swc/helpers,brotli,clone,dfa,fast-deep-equal,restructure,tiny-inflate,unicode-properties,unicode-trie,tslib,base64-js,pako}/**',
     `**/node_modules/@deepseek-ai/libreoffice-kit-${resolvedPlatform}-${resolvedArch}/**/*`]
   const windowsSigner = packagesWindows && !unsigned
     ? createWindowsTokenSigner({
@@ -137,10 +140,11 @@ export function createElectronBuilderConfig(
       { from: join(buildPaths.dsh, 'node_modules'), to: 'dsh/node_modules', filter: ['**/*'] },
     ],
     asarUnpack: unpack,
-    extraResources: [
-      { from: buildPaths.runtime, to: 'runtime' },
-      { from: iconResource('png'), to: 'icon.png' },
-    ],
+ extraResources: [
+ { from: buildPaths.runtime, to: 'runtime' },
+ { from: iconResource('png'), to: 'icon.png' },
+ ...(packagesWindows ? [{ from: fileURLToPath(new URL('../resources/tray-windows.ico', import.meta.url)), to: 'tray.ico' }] : []),
+ ],
     mac: {
       icon: iconResource('icns'),
       category: 'public.app-category.developer-tools',
@@ -149,9 +153,12 @@ export function createElectronBuilderConfig(
       forceCodeSigning: !unsigned,
       // macOS matches the application locale against this bundle, not Electron Framework resources.
       extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'], NSMicrophoneUsageDescription: `${desktopEdition.productName} uses your microphone to transcribe speech into message drafts.` },
-      identity: macOSSigning?.signingIdentity,
-      hardenedRuntime: true,
-      // ASAR-unpacked native runtime files are pre-signed; PAK resources are sealed by their enclosing bundle.
+      identity: unsigned ? '-' : macOSSigning?.signingIdentity,
+      // Ad-hoc signing cannot carry the JIT entitlement a hardened runtime needs.
+      hardenedRuntime: !unsigned,
+      // The runtime trees keep the signatures their own preparation produced: the release identity for a
+      // signed build, the published vendor signatures for a local unsigned build. PAK resources are sealed
+      // by their enclosing bundle.
       signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
       notarize: !unsigned,
       target: ['dmg', 'zip'],

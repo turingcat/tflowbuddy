@@ -13,7 +13,7 @@ interface RecoveryOperations {
   exit(): void
   restart(): void
   /** Persist the complete diagnostic; resolves with the file path, or `undefined` when nothing was written. */
-  writeReport(error: unknown, source: CrashReportSource): Promise<string | undefined>
+  writeReport?: (error: unknown, source: CrashReportSource) => Promise<string | undefined>
 }
 
 /** Upper bound on waiting for the crash report before the dialog opens. */
@@ -107,7 +107,7 @@ export class DesktopFatalRecovery {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       return await Promise.race([
-        this.operations.writeReport(error, source),
+        this.operations.writeReport?.(error, source) ?? Promise.resolve(undefined),
         new Promise<undefined>((resolve) => { timer = setTimeout(() => { resolve(undefined) }, CRASH_REPORT_WAIT_MS) }),
       ])
     } catch (failure) {

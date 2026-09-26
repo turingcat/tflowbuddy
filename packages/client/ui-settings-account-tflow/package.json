@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-settings-account-tflow",
   "description": "Show the signed-in TFlow account, balance, and subscription",
-  "version": "0.1.7-alpha.1",
+  "version": "0.1.7-rc.2",
   "publishConfig": {
     "access": "public"
   },

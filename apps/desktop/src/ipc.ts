@@ -24,6 +24,8 @@ export const DESKTOP_IPC = {
   localeBootstrap: 'dsh-desktop:locale-bootstrap',
   localeChanged: 'dsh-desktop:locale-changed',
   tflowAccount: 'dsh-desktop:tflow-account',
+  tflowUsage: 'dsh-desktop:tflow-usage',
+  tflowSignOut: 'dsh-desktop:tflow-sign-out',
   updatesStatus: 'dsh-desktop:updates-status',
   updatesOpen: 'dsh-desktop:updates-open',
   updatesPresentation: 'dsh-desktop:updates-presentation',

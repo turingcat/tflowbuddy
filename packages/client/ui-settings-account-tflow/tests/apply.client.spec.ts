@@ -4,6 +4,7 @@ import { afterEach, expect, vi } from 'vitest'
 import { createClientTest, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type { TFlowAccountInjected } from '../src/client/AccountSection.tsx'
+import type { TFlowUsageInjected } from '../src/client/UsageSection.tsx'
 
 const it = createClientTest({ roster: webApp })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
@@ -15,6 +16,15 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
  */
 function operations(slots: TestSlots): TFlowAccountInjected {
   return slots.entries('settings.launcher')[0]!.inject!() as TFlowAccountInjected
+}
+
+/**
+ * The usage section's injected operations, as the shell would call them.
+ * @param slots - the client's slot registry.
+ * @returns the operations the usage registration exposes.
+ */
+function usageOperations(slots: TestSlots): TFlowUsageInjected {
+  return slots.entries('settings.section').find(entry => entry.options.id === 'tflow-usage')!.inject!() as TFlowUsageInjected
 }
 
 /** The slot-registry surface this spec reads; the shipped registry satisfies it. */
@@ -122,5 +132,49 @@ it('opens the TFlow site for account management', async ({ start }) => {
   const open = vi.spyOn(window, 'open').mockReturnValue(null)
   const context = await start()
   operations(context.ctx.slots as unknown as TestSlots).manage()
-  expect(open).toHaveBeenCalledWith('https://tflow.online', '_blank', 'noopener,noreferrer')
+  expect(open).toHaveBeenCalledWith('https://www.tflow.online/dashboard', '_blank', 'noopener,noreferrer')
+})
+
+it('exposes sign out through the account launcher', async ({ start }) => {
+  const signOut = vi.fn(() => Promise.resolve())
+  vi.stubGlobal('dshDesktopAccount', { read: () => Promise.resolve(null), signOut })
+  const context = await start()
+  await operations(context.ctx.slots as unknown as TestSlots).signOut()
+  expect(signOut).toHaveBeenCalledOnce()
+})
+
+it('registers the usage section beside the account section and reads the shell usage', async ({ start }) => {
+  const usage = { today: { requests: 4, tokens: 1200, cost: 0.4 }, total: { requests: 90, tokens: 56000, cost: 9.6 } }
+  vi.stubGlobal('dshDesktopAccount', { read: () => Promise.resolve(null), usage: () => Promise.resolve(usage) })
+  const context = await start()
+  const slots = context.ctx.slots as unknown as TestSlots
+  const sections = slots.entries('settings.section')
+  const section = sections.find(entry => entry.options.id === 'tflow-usage')
+  expect(resolveSlotLabel(section!.options.label)).toBe('Usage')
+  // The usage page sits directly below the account page in the settings navigation.
+  const ids = sections.map(entry => entry.options.id)
+  expect(ids.indexOf('tflow-usage')).toBe(ids.indexOf('tflow-account') + 1)
+  const actions = usageOperations(slots)
+  await actions.refresh()
+  expect(actions.hooks.usage.getSnapshot()).toEqual({ status: 'ready', usage })
+})
+
+it('reports signed-out and failed usage reads as distinct states', async ({ start }) => {
+  const answers: Array<() => Promise<unknown>> = [() => Promise.resolve(null), () => Promise.reject(new Error('panel unreachable'))]
+  vi.stubGlobal('dshDesktopAccount', { read: () => Promise.resolve(null), usage: () => answers.shift()!() })
+  const context = await start()
+  const actions = usageOperations(context.ctx.slots as unknown as TestSlots)
+  await actions.refresh()
+  expect(actions.hooks.usage.getSnapshot()).toEqual({ status: 'signed-out' })
+  await actions.refresh()
+  expect(actions.hooks.usage.getSnapshot()).toEqual({ status: 'failed' })
+})
+
+it('refuses usage missing a total rather than rendering it as zero', async ({ start }) => {
+  const partial = { today: { requests: 4, tokens: 1200, cost: 0.4 }, total: { requests: 90, tokens: 56000 } }
+  vi.stubGlobal('dshDesktopAccount', { read: () => Promise.resolve(null), usage: () => Promise.resolve(partial) })
+  const context = await start()
+  const actions = usageOperations(context.ctx.slots as unknown as TestSlots)
+  await actions.refresh()
+  expect(actions.hooks.usage.getSnapshot()).toEqual({ status: 'failed' })
 })

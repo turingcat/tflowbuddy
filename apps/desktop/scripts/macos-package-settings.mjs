@@ -39,7 +39,7 @@ export function macOSDownloadEnvironment(environment, proxyUrl) {
   if (proxyUrl === undefined) return { ...environment }
   // A configured mirror is reachable directly, and routing it through the proxy
   // is what breaks its transfer; every other host keeps the proxy.
-  const mirrorHosts = ['DSH_DESKTOP_ELECTRON_MIRROR', 'DSH_DESKTOP_NODE_MIRROR', 'DSH_DESKTOP_PYTHON_MIRROR']
+  const mirrorHosts = ['DSH_DESKTOP_ELECTRON_MIRROR', 'DSH_DESKTOP_PYTHON_MIRROR']
     .flatMap(name => {
       const value = environment[name]?.trim()
       if (!value) return []

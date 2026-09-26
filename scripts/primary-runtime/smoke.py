@@ -1,6 +1,7 @@
 """Exercise the relocated Office payload with its own isolated interpreter."""
 
 import importlib.metadata
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -25,9 +26,13 @@ def main():
     """Check installed versions and read back editable Office documents."""
     assert sys.version_info[:3] == tuple(map(int, sys.argv[2].split("."))), sys.version
     versions = json.loads(sys.argv[1])
-    # Only pip belongs to the interpreter baseline; all other distributions must be declared.
-    # Each target's native release-host smoke must confirm this baseline.
-    expected_names = {re.sub(r"[-_.]+", "-", name).lower() for name in versions} | {"pip"}
+    compact = sys.argv[4] == "compact"
+    # Only pip belongs to the complete interpreter baseline; a compact payload removes it.
+    # All other distributions must be declared. Each target's native release-host smoke must confirm this baseline.
+    expected_names = {re.sub(r"[-_.]+", "-", name).lower() for name in versions} | (set() if compact else {"pip"})
+    if compact:
+        for module in ("pip", "ensurepip", "idlelib", "tkinter"):
+            assert importlib.util.find_spec(module) is None, module
     installed_names = {
         re.sub(r"[-_.]+", "-", distribution.metadata["Name"]).lower()
         for distribution in importlib.metadata.distributions()

@@ -13,6 +13,18 @@ const CREDENTIALS = {
   panelUrl: 'https://tflow.online',
 }
 
+/**
+ * A `session/modelCatalog` reply whose TFlow group lists these models.
+ * @param models - TFlow group entries.
+ * @returns a catalog that also carries an unrelated provider group.
+ */
+function catalog(models: unknown[]): unknown {
+  return {
+    groups: [{ id: 'deepseek', name: 'DeepSeek', models: [{ id: 'deepseek-chat' }] }, { id: 'tflow', name: 'TFlow', models }],
+    failures: [],
+  }
+}
+
 /** One recorded Host call. */
 interface RecordedCall { namespace: string; method: string; args: Record<string, unknown> }
 
@@ -36,13 +48,12 @@ function invoke(answers: Record<string, unknown> = {}): HostInvoke & { calls: Re
 
 describe('applyTFlowRoute', () => {
   it('declares the gateway route, then stores the key, then points the default model at the first model', async () => {
-    const host = invoke({
-      'llm/listModels': [{ id: 'glm-5' }, { id: 'qwen3' }],
-    })
+    const host = invoke({ 'session/modelCatalog': catalog([{ id: 'glm-5' }, { id: 'qwen3' }]) })
     await applyTFlowRoute(host, CREDENTIALS, ['glm-5', 'qwen3'])
 
     const [route, key, directory, selection] = host.calls
-    expect(route).toMatchObject({ namespace: 'llm-pi-ai', method: 'update' })
+    // The Host exposes settings namespaces only through the `settings` Remote; `/api/llm-pi-ai/update` answers 404.
+    expect(route).toMatchObject({ namespace: 'settings', method: 'update', args: { ns: 'llm-pi-ai' } })
     expect(route!.args['patch']).toEqual({
       providers: {
         tflow: {
@@ -55,10 +66,11 @@ describe('applyTFlowRoute', () => {
       },
     })
     expect(key).toMatchObject({ namespace: 'credentials', method: 'set', args: { ref: 'TFLOW_MODEL_KEY', value: 'sk-model' } })
-    expect(directory).toMatchObject({ namespace: 'llm', method: 'listModels', args: { provider: 'tflow' } })
+    // The Host exposes no `llm` Remote; `session/modelCatalog` is its model directory.
+    expect(directory).toEqual({ namespace: 'session', method: 'modelCatalog', args: {} })
     expect(selection).toMatchObject({
-      namespace: 'agent-default-model', method: 'update',
-      args: { patch: { provider: 'tflow', model: 'glm-5' } },
+      namespace: 'settings', method: 'update',
+      args: { ns: 'agent-default-model', patch: { provider: 'tflow', model: 'glm-5' } },
     })
   })
 
@@ -66,7 +78,7 @@ describe('applyTFlowRoute', () => {
     const host = invoke({
       // The adapter may drop a model the gateway advertised; the default must
       // name one the route actually serves.
-      'llm/listModels': [{ id: 'served-first' }],
+      'session/modelCatalog': catalog([{ id: 'served-first' }]),
     })
     await applyTFlowRoute(host, CREDENTIALS, ['advertised-first', 'served-first'])
     const selection = host.calls.at(-1)!
@@ -74,24 +86,33 @@ describe('applyTFlowRoute', () => {
   })
 
   it('skips directory entries without a usable identifier', async () => {
-    const host = invoke({ 'llm/listModels': [{ name: 'no id' }, { id: '' }, { id: 'usable' }] })
+    const host = invoke({ 'session/modelCatalog': catalog([{ name: 'no id' }, { id: '' }, { id: 'usable' }]) })
     await applyTFlowRoute(host, CREDENTIALS, ['usable'])
     expect(host.calls.at(-1)!.args['patch']).toEqual({ provider: 'tflow', model: 'usable' })
   })
 
   it('refuses to leave a default selection behind when the route serves nothing', async () => {
-    const host = invoke({ 'llm/listModels': [] })
+    // The catalog omits provider groups with no models.
+    const host = invoke({ 'session/modelCatalog': { groups: [], failures: [] } })
     await expect(applyTFlowRoute(host, CREDENTIALS, [])).rejects.toThrow(/serves no model/u)
-    expect(host.calls.some(call => call.namespace === 'agent-default-model')).toBe(false)
+    expect(host.calls.some(call => call.args['ns'] === 'agent-default-model')).toBe(false)
   })
 
-  it('refuses a directory that is not a list', async () => {
-    const host = invoke({ 'llm/listModels': { models: [] } })
+  it('reports why the TFlow route could not list its models', async () => {
+    const host = invoke({
+      'session/modelCatalog': { groups: [], failures: [{ id: 'tflow', name: 'TFlow', message: 'HTTP 401' }] },
+    })
+    await expect(applyTFlowRoute(host, CREDENTIALS, ['glm-5'])).rejects.toThrow(/TFlow route failed to list models: HTTP 401/u)
+    expect(host.calls.some(call => call.args['ns'] === 'agent-default-model')).toBe(false)
+  })
+
+  it('refuses a catalog without provider groups', async () => {
+    const host = invoke({ 'session/modelCatalog': [] })
     await expect(applyTFlowRoute(host, CREDENTIALS, ['glm-5'])).rejects.toThrow(/invalid model directory/u)
   })
 
   it('never writes the model key into the settings document', async () => {
-    const host = invoke({ 'llm/listModels': [{ id: 'glm-5' }] })
+    const host = invoke({ 'session/modelCatalog': catalog([{ id: 'glm-5' }]) })
     await applyTFlowRoute(host, CREDENTIALS, ['glm-5'])
     for (const call of host.calls.filter(entry => entry.namespace !== 'credentials')) {
       expect(JSON.stringify(call.args)).not.toContain('sk-model')
@@ -105,8 +126,8 @@ describe('revokeTFlowRoute', () => {
     await revokeTFlowRoute(host)
     expect(host.calls).toEqual([
       { namespace: 'credentials', method: 'unset', args: { ref: 'TFLOW_MODEL_KEY' } },
-      { namespace: 'llm-pi-ai', method: 'mutate', args: { ops: [{ op: 'unset', path: ['providers', 'tflow'] }], expectedRevision: undefined } },
-      { namespace: 'agent-default-model', method: 'update', args: { patch: { provider: '', model: '' }, expectedRevision: undefined } },
+      { namespace: 'settings', method: 'mutate', args: { ns: 'llm-pi-ai', ops: [{ op: 'unset', path: ['providers', 'tflow'] }], expectedRevision: undefined } },
+      { namespace: 'settings', method: 'update', args: { ns: 'agent-default-model', patch: { provider: '', model: '' }, expectedRevision: undefined } },
     ])
   })
 })
@@ -176,7 +197,7 @@ describe('connectHostRpc', () => {
   })
 
   it.each([
-    ['a failed status', () => ({ type: 'server-response', rpcId: null, result: { ok: true, value: 1 } }), 500, /Web request failed/u],
+    ['a failed status', () => ({ type: 'server-response', rpcId: null, result: { ok: true, value: 1 } }), 500, /Web request settings\/describe failed with HTTP 500/u],
     ['a non-envelope body', () => 'plain', 200, /Web RPC failed/u],
     ['a mismatched rpcId', () => ({ type: 'server-response', rpcId: 'other', result: { ok: true, value: 1 } }), 200, /Web RPC failed/u],
     ['a failed result', (rpcId: string) => ({ type: 'server-response', rpcId, result: { ok: false } }), 200, /Web RPC failed/u],

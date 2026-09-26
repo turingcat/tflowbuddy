@@ -51,6 +51,7 @@ function backend(overrides: Partial<TFlowLoginBackend> = {}): TFlowLoginBackend 
     signOut: () => Promise.resolve({ kind: 'signed-out' }),
     cancel: () => Promise.resolve({ kind: 'signed-out' }),
     account: () => Promise.resolve(undefined),
+    usage: () => Promise.resolve(undefined),
     subscribe: () => () => {},
     ...overrides,
   }

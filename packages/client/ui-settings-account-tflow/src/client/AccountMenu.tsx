@@ -11,7 +11,7 @@
  */
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Menu, IconSettingsOutlineMedium, IconRightUpOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { TFlowAccountInjected } from './AccountSection.tsx'
 import css from './AccountMenu.module.css'
 
@@ -24,9 +24,11 @@ export type TFlowAccountMenuProps =
  * @param props - sidebar geometry, settings navigation, and account access.
  * @returns the launcher and its menu.
  */
-export function TFlowAccountMenu({ wide, openSettings, useAccount, manage, t }: TFlowAccountMenuProps) {
+export function TFlowAccountMenu({ wide, openSettings, useAccount, refresh, manage, signOut, t }: TFlowAccountMenuProps) {
   const snapshot = useAccount(value => value)
   const [open, setOpen] = useState(false)
+  // The launcher is the first account surface on screen, so it starts the read that fills in the username.
+  useEffect(() => { void refresh() }, [refresh])
   const label = snapshot.status === 'ready' ? snapshot.account.displayName : null
   return <div className={css.root}>
     <Menu open={open} side="top" portal autoFocus className={css.anchor}
@@ -36,13 +38,17 @@ export function TFlowAccountMenu({ wide, openSettings, useAccount, manage, t }: 
       </button>}
       items={[
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} /> },
+        { id: 'usage', label: t('usage') },
         { id: 'manage', label: t('manage'), icon: <IconRightUpOutlineRegular size={16} /> },
+        { id: 'sign-out', label: t('signOut') },
       ]}
       onClose={() => { setOpen(false) }}
       onSelect={(id) => {
         setOpen(false)
         if (id === 'settings') openSettings()
-        else manage()
+        else if (id === 'usage') openSettings()
+        else if (id === 'manage') manage()
+        else void signOut()
       }} />
   </div>
 }

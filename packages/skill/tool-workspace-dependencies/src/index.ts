@@ -11,7 +11,7 @@ export const name = 'tool-workspace-dependencies'
 /** Registry the tool registers into. */
 export const inject = ['tools']
 
-/** Payload location and optional installation directory. */
+/** Payload location, optional installation directory, and optional carrier-supplied Node.js and pnpm. */
 export interface Config {
   /** Payload directory carrying `runtime.json` and `dependencies/`. */
   readonly source: string
@@ -21,12 +21,21 @@ export interface Config {
    * which suits read-only carriers such as container image layers.
    */
   readonly root?: string
+  /**
+   * Absolute Node.js executable the carrier supplies instead of the payload, such as Desktop's
+   * Electron launcher. A payload that also ships Node.js fails the first call.
+   */
+  readonly node?: string
+  /** Absolute pnpm entry script run through {@link Config.node}; requires `node`. */
+  readonly pnpm?: string
 }
 
 /** Require a named payload source before the Loader activates the tool. */
 export const Config: z<Config> = z.object({
   source: z.string().min(1).required(),
   root: z.string().min(1),
+  node: z.string().min(1),
+  pnpm: z.string().min(1),
 })
 
 /** Canonical build metadata, independent of user-installed packages; legacy files are normalized on read. */
@@ -233,14 +242,30 @@ export async function installPrimaryRuntime(source: string, root: string): Promi
 }
 
 /**
+ * Add the carrier's Node.js and pnpm entries to the payload paths.
+ * @param paths - Paths into the prepared payload.
+ * @param config - Plugin configuration.
+ * @returns The payload paths, plus the carrier entries when configured.
+ * @throws When the payload also ships Node.js, or a carrier entry is not a file.
+ */
+async function withCarrierEntries(paths: WorkspaceDependencies, config: Config): Promise<WorkspaceDependencies> {
+  if (config.node === undefined) return paths
+  if (paths.node !== undefined) throw new Error('workspace dependencies: the payload and the configuration both supply Node.js')
+  const supplied = { ...paths, node: config.node, ...(config.pnpm === undefined ? {} : { pnpm: config.pnpm }) }
+  await validatePayloadEntries(supplied)
+  return supplied
+}
+
+/**
  * Register the read-only path query; the first invocation prepares (or merely validates) the payload.
  * @param ctx - Tool registry owner.
  * @param config - Payload location and optional installation directory.
  */
 export function apply(ctx: Context, config: Config): void {
-  if (!isAbsolute(config.source) || (config.root !== undefined && !isAbsolute(config.root))) {
-    throw new Error('workspace dependencies: source and root must be absolute paths')
+  if ([config.source, config.root, config.node, config.pnpm].some(path => path !== undefined && !isAbsolute(path))) {
+    throw new Error('workspace dependencies: source, root, node, and pnpm must be absolute paths')
   }
+  if (config.pnpm !== undefined && config.node === undefined) throw new Error('workspace dependencies: pnpm requires node')
   let preparation: Promise<WorkspaceDependencies> | undefined
   ctx.effect(() => async () => {
     // Tool execution reports preparation failures; disposal only waits for filesystem work to settle.
@@ -266,6 +291,7 @@ export function apply(ctx: Context, config: Config): void {
     },
     execute: () => {
       preparation ??= (config.root === undefined ? resolvePrimaryRuntime(config.source) : installPrimaryRuntime(config.source, config.root))
+        .then(paths => withCarrierEntries(paths, config))
         .catch((error: unknown) => {
           preparation = undefined
           throw error

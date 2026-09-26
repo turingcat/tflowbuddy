@@ -2,7 +2,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { cp } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -61,19 +61,60 @@ async function pythonArchive(target: keyof typeof lock.targets, cache: string): 
  * Identify the inputs that assemble one target's payload, excluding unrelated target locks.
  * @param target - Runtime target whose archives are installed.
  * @param runtimeLock - Locked interpreter and wheel inputs.
- * @param pnpmVersion - Package-manager version copied into the payload.
+ * @param compact - Whether the payload omits the entries {@link compactInterpreter} removes.
  * @returns SHA-256 payload identity for installation reuse.
  */
 export function primaryRuntimePayloadDigest(
-  target: keyof typeof lock.targets, runtimeLock: typeof lock, pnpmVersion: string | undefined,
+  target: keyof typeof lock.targets, runtimeLock: typeof lock, compact: boolean,
 ): string {
-  const { pythonVersion, pythonRelease, nodeVersion, wheels, pythonPackages } = runtimeLock
+  const { pythonVersion, pythonRelease, wheels, pythonPackages } = runtimeLock
   // Identity preserves key order within the selected target, wheel records and distribution map, plus wheel-entry order.
   // Bump format when extraction or assembly changes payload bytes without changing locked inputs.
   return createHash('sha256').update(JSON.stringify({
-    format: 4, target, pythonVersion, pythonRelease, nodeVersion: pnpmVersion === undefined ? undefined : nodeVersion,
-    artifact: runtimeLock.targets[target], wheels, pythonPackages, pnpm: pnpmVersion,
+    format: 5, target, pythonVersion, pythonRelease, artifact: runtimeLock.targets[target], wheels, pythonPackages, compact,
   })).digest('hex')
+}
+
+/** One directory's entries a compact payload removes; every rule must match, so an upstream layout change fails the build. */
+interface CompactRule {
+  readonly directory: string
+  readonly entries: RegExp
+}
+
+/**
+ * Remove pip, ensurepip, the IDLE and Tk GUI stack, and duplicate interpreter names from an extracted interpreter.
+ * The single remaining Unix executable is `bin/python3`, the entry {@link workspaceDependencyPaths} returns; the
+ * other names are byte-identical copies once the payload is materialized without links.
+ * @param python - Extracted `python/` directory.
+ * @param target - Target whose archive layout was extracted.
+ * @throws When a rule matches nothing, which means the locked archive layout changed.
+ */
+export function compactInterpreter(python: string, target: PrimaryRuntimeTarget): void {
+  const stdlib = target === 'win-x64' ? 'Lib' : join('lib', `python${lock.pythonVersion.split('.').slice(0, 2).join('.')}`)
+  const gui = /^(?:ensurepip|idlelib|tkinter|turtledemo|turtle\.py)$/u
+  const rules: CompactRule[] = [
+    { directory: stdlib, entries: gui },
+    { directory: join(stdlib, 'site-packages'), entries: /^pip(?:-[\d.]+\.dist-info)?$/u },
+  ]
+  if (target === 'win-x64') {
+    rules.push({ directory: 'DLLs', entries: /^(?:_tkinter\.pyd|(?:tcl|tk)\d+t\.dll)$/u }, { directory: '.', entries: /^tcl$/u })
+  } else {
+    const executable = `python${lock.pythonVersion.split('.').slice(0, 2).join('.')}`
+    // `bin/python3` is a link to the versioned executable in the archive; the executable takes its name.
+    rmSync(join(python, 'bin', 'python3'))
+    renameSync(join(python, 'bin', executable), join(python, 'bin', 'python3'))
+    rules.push(
+      { directory: 'bin', entries: /^(?!python3$)/u },
+      { directory: 'lib', entries: /^(?:(?:itcl|tcl|tk|thread)[\d.]+|lib(?:tcl|tk)[\w.]*)$/u },
+      { directory: join(stdlib, 'lib-dynload'), entries: /^_tkinter\./u },
+    )
+  }
+  for (const rule of rules) {
+    const directory = join(python, rule.directory)
+    const matched = readdirSync(directory).filter(name => rule.entries.test(name))
+    if (matched.length === 0) throw new Error(`primary runtime: compact rule ${String(rule.entries)} matched nothing in ${directory}`)
+    for (const name of matched) rmSync(join(directory, name), { recursive: true, force: true })
+  }
 }
 
 /**
@@ -108,7 +149,7 @@ export async function prepareOfficeSkillAssets(source: string, destination: stri
 /** A locked interpreter and wheel target. */
 export type PrimaryRuntimeTarget = keyof typeof lock.targets
 
-/** Build-only inputs shared by Desktop and SDK carriers. */
+/** Build-only inputs shared by Desktop and SDK carriers; both carry Python only, and Desktop supplies Node.js and pnpm from Electron. */
 export interface PreparePrimaryRuntimeOptions {
   /** Target whose archives and wheels are downloaded. */
   readonly target: PrimaryRuntimeTarget
@@ -118,8 +159,11 @@ export interface PreparePrimaryRuntimeOptions {
   readonly cache: string
   /** Carrier release recorded in the legacy desktopVersion manifest field. */
   readonly version: string
-  /** Omit Node.js and pnpm for carriers providing only Python. */
-  readonly pythonOnly?: boolean
+  /**
+   * Remove pip, ensurepip, the IDLE and Tk GUI stack, and duplicate interpreter names (see {@link compactInterpreter}).
+   * The single-file SDK keeps the complete interpreter.
+   */
+  readonly compact?: boolean
 }
 
 /**
@@ -138,37 +182,15 @@ export async function preparePrimaryRuntime(options: PreparePrimaryRuntimeOption
     const output = join(staging, 'payload')
     const dependencies = join(output, 'dependencies')
     mkdirSync(dependencies, { recursive: true })
-    let pnpmVersion: string | undefined
-    if (!options.pythonOnly) {
-      const nodeFilename = `node-v${lock.nodeVersion}-${artifact.nodeArchive}`
-      const nodeUpstream = `https://nodejs.org/dist/v${lock.nodeVersion}/${nodeFilename}`
-      const nodeArchive = await downloadPrimaryRuntimeAsset(runtimeAssetUrl(nodeUpstream,
-        process.env.DSH_DESKTOP_NODE_MIRROR?.trim() || undefined,
-        `v${lock.nodeVersion}/${nodeFilename}`), artifact.nodeSha256, paths.downloads)
-      const unpackedNode = join(staging, 'node')
-      mkdirSync(unpackedNode)
-      if (target === 'win-x64') await extractZip(nodeArchive, { dir: unpackedNode })
-      else await extractTar({ file: nodeArchive, cwd: unpackedNode })
-      const nodeSource = join(unpackedNode, nodeFilename.replace(/\.(?:zip|tar\.gz)$/u, ''))
-      mkdirSync(join(dependencies, 'node', 'bin'), { recursive: true })
-      mkdirSync(join(dependencies, 'node', 'node_modules'))
-      writeFileSync(join(dependencies, 'node', 'node_modules', 'README.txt'), 'Reserved for bundled Node packages. pnpm uses its default installation directories.\n')
-      cpSync(join(nodeSource, ...(target === 'win-x64' ? ['node.exe'] : ['bin', 'node'])),
-        join(dependencies, 'node', 'bin', target === 'win-x64' ? 'node.exe' : 'node'))
-      cpSync(join(nodeSource, 'LICENSE'), join(dependencies, 'node', 'LICENSE'))
-      const require = createRequire(import.meta.url)
-      const pnpmManifest = require.resolve('pnpm')
-      pnpmVersion = (JSON.parse(readFileSync(pnpmManifest, 'utf8')) as { version: string }).version
-      await cp(dirname(pnpmManifest), join(dependencies, 'pnpm'), { recursive: true, dereference: true })
-    }
     await extractTar({ file: await pythonArchive(target, paths.downloads), cwd: dependencies })
+    const compact = options.compact === true
+    if (compact) compactInterpreter(join(dependencies, 'python'), target)
     const manifest: PrimaryRuntimeManifest = {
       desktopVersion: options.version,
       platform: target === 'win-x64' ? 'win32' : target.startsWith('linux-') ? 'linux' : 'darwin',
       arch: target.endsWith('-arm64') ? 'arm64' : 'x64',
-      payloadDigest: primaryRuntimePayloadDigest(target, lock, pnpmVersion),
+      payloadDigest: primaryRuntimePayloadDigest(target, lock, compact),
       python: lock.pythonVersion,
-      ...(pnpmVersion === undefined ? {} : { node: lock.nodeVersion, pnpm: pnpmVersion }),
       pythonPackages: lock.pythonPackages,
     }
     const entries = workspaceDependencyPaths(output, manifest)
@@ -188,40 +210,39 @@ export async function preparePrimaryRuntime(options: PreparePrimaryRuntimeOption
 }
 
 /**
- * Execute the native payload's interpreters, package manager and Python libraries.
+ * Execute the native payload's interpreter and Python libraries.
  * @param root - Final payload directory, including any platform signatures.
- * @param environment - Scrubbed subprocess environment; defaults to excluding credential-shaped names.
+ * @param options - Whether the payload was prepared compact, and the scrubbed subprocess environment
+ * (defaults to excluding credential-shaped names). A compact payload has no pip, so `pip check` cannot run;
+ * the exact distribution set and version checks in `smoke.py` still apply.
  */
-export function smokePrimaryRuntime(root: string, environment: NodeJS.ProcessEnv = Object.fromEntries(
-  Object.entries(process.env).filter(([name]) => !/(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(name)),
-)): void {
+export function smokePrimaryRuntime(root: string, options: { readonly compact: boolean; readonly environment?: NodeJS.ProcessEnv }): void {
+  const environment = options.environment ?? Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !/(?:KEY|SECRET|TOKEN|PASSWORD)/iu.test(name)),
+  )
   const manifest = parsePrimaryRuntime(JSON.parse(readFileSync(join(root, 'runtime.json'), 'utf8')))
   if (manifest.platform !== process.platform || manifest.arch !== process.arch) return
   if (Object.keys(manifest.pythonPackages).length === 0) throw new Error('primary runtime: missing Python distribution versions; prepare the payload before running its smoke checks.')
   const entries = workspaceDependencyPaths(root, manifest)
-  const options = { stdio: 'inherit', timeout: 120_000, env: environment } as const
-  execFileSync(entries.python, ['-I', '-B', '-c', 'import decimal, xml.parsers.expat, lzma, uuid, numpy, pandas; assert numpy.arange(4).sum() == 6; assert pandas.DataFrame({"n": [1, 2]}).n.sum() == 3'], options)
+  const execution = { stdio: 'inherit', timeout: 120_000, env: environment } as const
+  execFileSync(entries.python, ['-I', '-B', '-c', 'import decimal, xml.parsers.expat, lzma, uuid, numpy, pandas; assert numpy.arange(4).sum() == 6; assert pandas.DataFrame({"n": [1, 2]}).n.sum() == 3'], execution)
   execFileSync(entries.python, ['-I', '-B', join(import.meta.dirname, 'smoke.py'), JSON.stringify(manifest.pythonPackages),
-    manifest.python, join(dirname(root), 'office-skills', 'scripts', 'check_office.py')], options)
-  execFileSync(entries.python, ['-I', '-B', '-m', 'pip', 'check'], options)
-  if (entries.node !== undefined) execFileSync(entries.node, ['-e', `if (process.versions.node !== ${JSON.stringify(manifest.node)}) process.exit(1)`], options)
-  if (entries.pnpm !== undefined && entries.node !== undefined) execFileSync(entries.node, [entries.pnpm, '--version'], options)
+    manifest.python, join(dirname(root), 'office-skills', 'scripts', 'check_office.py'), options.compact ? 'compact' : 'complete'], execution)
+  if (!options.compact) execFileSync(entries.python, ['-I', '-B', '-m', 'pip', 'check'], execution)
 }
 
 if (import.meta.main) {
   const { values } = parseArgs({ options: {
     target: { type: 'string' }, output: { type: 'string' }, cache: { type: 'string' },
-    'python-only': { type: 'boolean', default: false },
   } })
   if (!values.target || !Object.hasOwn(lock.targets, values.target) || !values.output) {
-    throw new Error(`Usage: pnpm run prepare:primary-runtime --target <${Object.keys(lock.targets).join('|')}> --output <directory> [--cache <directory>] [--python-only]`)
+    throw new Error(`Usage: pnpm run prepare:primary-runtime --target <${Object.keys(lock.targets).join('|')}> --output <directory> [--cache <directory>]`)
   }
   const { version } = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as { version: string }
   const output = resolve(values.output)
   await preparePrimaryRuntime({
     target: values.target as PrimaryRuntimeTarget, output,
     cache: values.cache ?? join(tmpdir(), 'dsh-primary-runtime-downloads'), version,
-    pythonOnly: values['python-only'],
   })
-  smokePrimaryRuntime(join(output, 'primary-runtime'))
+  smokePrimaryRuntime(join(output, 'primary-runtime'), { compact: false })
 }

@@ -79,4 +79,9 @@ describe('desktop edition manifest', () => {
       expect(existsSync(new URL(`../resources/${desktopEdition.iconStem}.${suffix}`, import.meta.url))).toBe(true)
     }
   })
+
+  it('resets workspace visibility before reopening the login window on sign-out', () => {
+    const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8')
+    expect(main).toMatch(/await tflow\.signOut\(\)\s+enteredWorkspace = false\s+await showWelcome\(\)/u)
+  })
 })

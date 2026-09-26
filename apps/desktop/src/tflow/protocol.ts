@@ -20,6 +20,8 @@ import type {
   TFlowRemaining,
   TFlowSession,
   TFlowTotpChallenge,
+  TFlowUsage,
+  TFlowUsagePeriod,
 } from './types.ts'
 
 /** How one panel or gateway request failed. */
@@ -47,7 +49,7 @@ export class TFlowProtocolError extends Error {
   /** Operator-facing message the panel supplied, when it supplied one. */
   readonly reason?: string
 
-  constructor(kind: TFlowErrorKind, message: string, options: { status?: number, reason?: string } = {}) {
+  constructor(kind: TFlowErrorKind, message: string, options: { status?: number; reason?: string } = {}) {
     super(message)
     this.name = 'TFlowProtocolError'
     this.kind = kind
@@ -277,8 +279,8 @@ export async function fetchPublicSettings(options: TFlowRequestOptions): Promise
  */
 export async function signIn(
   options: TFlowRequestOptions,
-  credentials: { email: string, password: string, captchaProof: string },
-): Promise<{ kind: 'authenticated', session: TFlowSession } | { kind: 'totp-required', challenge: TFlowTotpChallenge }> {
+  credentials: { email: string; password: string; captchaProof: string },
+): Promise<{ kind: 'authenticated'; session: TFlowSession } | { kind: 'totp-required'; challenge: TFlowTotpChallenge }> {
   const data = await requestEnvelope(`${trimOrigin(options.panelUrl)}/api/v1/auth/login`, {
     method: 'POST',
     headers: CONTENT_TYPE_JSON,
@@ -454,14 +456,14 @@ export async function fetchSubscription(
   options: TFlowRequestOptions,
   accessToken: string,
   groupId: string,
-): Promise<{ groupName: string, remaining: TFlowRemaining } | null> {
+): Promise<{ groupName: string; remaining: TFlowRemaining } | null> {
   const data = await requestEnvelope(`${trimOrigin(options.panelUrl)}/api/v1/subscriptions/progress`, authorized(accessToken), options)
   if (!Array.isArray(data)) throw new TFlowProtocolError('protocol', 'TFlow 订阅响应格式异常')
   for (const item of data) {
     if (!isRecord(item) || groupIdOf(isRecord(item['subscription']) ? item['subscription']['group_id'] : undefined) !== groupId) continue
     const progress = item['progress']
     if (!isRecord(progress)) throw new TFlowProtocolError('protocol', 'TFlow 订阅响应格式异常')
-    const remaining: { daily?: number, weekly?: number, monthly?: number } = {}
+    const remaining: { daily?: number; weekly?: number; monthly?: number } = {}
     for (const window of ['daily', 'weekly', 'monthly'] as const) {
       const entry = progress[window]
       if (entry === undefined) continue
@@ -495,6 +497,33 @@ export async function fetchEntitlement(
   return subscription === null
     ? { kind: 'balance', account }
     : { kind: 'subscription', account, groupName: subscription.groupName, remaining: subscription.remaining }
+}
+
+/**
+ * Read one usage period from the panel's dashboard statistics.
+ * @param data - dashboard statistics object.
+ * @param prefix - `today` or `total`, the panel's field prefix.
+ * @returns the request, token, and charged totals.
+ */
+function usagePeriod(data: Record<string, unknown>, prefix: 'today' | 'total'): TFlowUsagePeriod {
+  return {
+    requests: requiredNumber(data, `${prefix}_requests`, 'TFlow 用量'),
+    tokens: requiredNumber(data, `${prefix}_tokens`, 'TFlow 用量'),
+    cost: requiredNumber(data, `${prefix}_actual_cost`, 'TFlow 用量'),
+  }
+}
+
+/**
+ * Read the signed-in user's usage for today and all time.
+ * @param options - panel address and transport.
+ * @param accessToken - current panel access token.
+ * @returns today's and cumulative totals; cost is the amount the panel deducted.
+ * @throws TFlowProtocolError when the token is refused or the payload is off-contract.
+ */
+export async function fetchUsage(options: TFlowRequestOptions, accessToken: string): Promise<TFlowUsage> {
+  const data = await requestEnvelope(`${trimOrigin(options.panelUrl)}/api/v1/usage/dashboard/stats`, authorized(accessToken), options)
+  if (!isRecord(data)) throw new TFlowProtocolError('protocol', 'TFlow 用量响应格式异常')
+  return { today: usagePeriod(data, 'today'), total: usagePeriod(data, 'total') }
 }
 
 /**

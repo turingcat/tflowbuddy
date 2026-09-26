@@ -36,12 +36,11 @@ it('overrides conflicting child proxy variables while preserving the parent and 
 it('routes configured mirrors around the download proxy and hands Electron its mirror', () => {
   const parent = {
     DSH_DESKTOP_ELECTRON_MIRROR: 'https://electron.example/binary/',
-    DSH_DESKTOP_NODE_MIRROR: 'https://node.example/binary/',
     DSH_DESKTOP_PYTHON_MIRROR: 'https://python.example/releases/',
   }
   const child = macOSDownloadEnvironment(parent, 'http://proxy:8080')
   // A mirror is reachable directly, so the proxy must not carry its transfer.
-  expect(child.NO_PROXY).toBe('localhost,127.0.0.1,::1,electron.example,node.example,python.example')
+  expect(child.NO_PROXY).toBe('localhost,127.0.0.1,::1,electron.example,python.example')
   expect(child.no_proxy).toBe(child.NO_PROXY)
   expect(child.ELECTRON_MIRROR).toBe('https://electron.example/binary/')
 })
@@ -53,6 +52,6 @@ it('leaves the Electron mirror unset when none is configured', () => {
 })
 
 it('ignores a mirror value that is not a URL when building the bypass list', () => {
-  const child = macOSDownloadEnvironment({ DSH_DESKTOP_NODE_MIRROR: 'not a url', PATH: 'tools' }, 'http://proxy:8080')
+  const child = macOSDownloadEnvironment({ DSH_DESKTOP_PYTHON_MIRROR: 'not a url', PATH: 'tools' }, 'http://proxy:8080')
   expect(child.NO_PROXY).toBe('localhost,127.0.0.1,::1')
 })

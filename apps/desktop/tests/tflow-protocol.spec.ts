@@ -8,6 +8,7 @@ import {
   fetchEntitlement,
   fetchPublicSettings,
   fetchSubscription,
+  fetchUsage,
   gatewayRoot,
   listGroups,
   listModels,
@@ -31,9 +32,11 @@ function body(value: unknown, status = 200): Response {
 }
 
 /** A transport that answers each request from a queue and records what it received. */
-function queued(...responses: Array<Response | (() => Response)>): TFlowFetch & { calls: Array<{ url: string, init: RequestInit | undefined }> } {
+function queued(
+  ...responses: Array<Response | (() => Response)>
+): TFlowFetch & { calls: Array<{ url: string; init: RequestInit | undefined }> } {
   const queue = [...responses]
-  const calls: Array<{ url: string, init: RequestInit | undefined }> = []
+  const calls: Array<{ url: string; init: RequestInit | undefined }> = []
   const fetchImpl = (url: string, init?: RequestInit): Promise<Response> => {
     calls.push({ url, init })
     const next = queue.shift()
@@ -431,6 +434,28 @@ describe('fetchEntitlement', () => {
   it('falls back to the balance when no subscription covers the group', async () => {
     const fetchImpl = queued(envelope({ email: 'alice@example.com', balance: 3 }), envelope([]))
     await expect(fetchEntitlement({ ...OPTIONS, fetch: fetchImpl }, 'access', '7')).resolves.toMatchObject({ kind: 'balance' })
+  })
+})
+
+describe('fetchUsage', () => {
+  const stats = {
+    today_requests: 4, today_tokens: 1200, today_cost: 0.5, today_actual_cost: 0.4,
+    total_requests: 90, total_tokens: 56000, total_cost: 12, total_actual_cost: 9.6,
+  }
+
+  it('reports what the panel deducted, not the standard price', async () => {
+    const fetchImpl = queued(envelope(stats))
+    await expect(fetchUsage({ ...OPTIONS, fetch: fetchImpl }, 'access')).resolves.toEqual({
+      today: { requests: 4, tokens: 1200, cost: 0.4 },
+      total: { requests: 90, tokens: 56000, cost: 9.6 },
+    })
+    expect(fetchImpl.calls[0]?.url).toBe(`${PANEL}/api/v1/usage/dashboard/stats`)
+  })
+
+  it('refuses a payload missing a total rather than reporting it as zero', async () => {
+    const { total_actual_cost: _omitted, ...partial } = stats
+    const fetchImpl = queued(envelope(partial))
+    await expect(fetchUsage({ ...OPTIONS, fetch: fetchImpl }, 'access')).rejects.toThrow(/total_actual_cost/u)
   })
 })
 

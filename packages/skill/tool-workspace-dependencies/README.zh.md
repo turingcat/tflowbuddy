@@ -25,7 +25,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-与工具注册表一起挂载，给出 payload 目录。配置校验在激活前要求非空 `source` 并拒绝空 `root`；两条路径都必须为绝对路径。内置 Office skills（`@deepseek-ai/dsh-skill-office`）按名字引用本工具取默认解释器。
+与工具注册表一起挂载，给出 payload 目录。配置校验在激活前要求非空 `source` 并拒绝空的 `root`、`node`、`pnpm`；所有路径都必须为绝对路径，且 `pnpm` 需要 `node`。内置 Office skills（`@deepseek-ai/dsh-skill-office`）按名字引用本工具取默认解释器。
 
 ### 最小配置
 
@@ -39,6 +39,8 @@ kind: "package-reference"
 |---|---|---|
 | `source` | 必填 | 含 `runtime.json` 与 `dependencies/` 的 payload 绝对目录。 |
 | `root` | 未设置 | Harness home 下的绝对安装目录。设置时首次调用把 payload 复制过去，`runtime.json` 不变则复用；未设置时校验后原地使用，不复制。 |
+| `node` | 未设置 | 由承载方替代 payload 提供的绝对 Node.js 可执行文件；桌面端传入其 Electron 启动器。payload 自带 Node.js 时首次调用失败。 |
+| `pnpm` | 未设置 | 通过 `node` 运行的绝对 pnpm 入口脚本。 |
 
 ### payload 布局
 
@@ -48,7 +50,7 @@ kind: "package-reference"
 
 ### 构建载体 payload
 
-在已安装依赖的仓库 checkout 中运行 `CI=true pnpm run prepare:primary-runtime --target linux-x64 --output /tmp/dsh-office`，会生成 `primary-runtime/` 和 `office-skills/`。[共享下载锁](../../../scripts/primary-runtime/lock.json)还覆盖 `linux-arm64`、`mac-arm64`、`mac-x64` 和 `win-x64`。`--python-only` 省略 Node.js 和 pnpm；`--cache` 选择经过哈希校验的归档缓存。入口仅对本机目标执行解释器与 Office 读写检查。跨目标构建必须在部署前到目标主机执行这些检查。
+在已安装依赖的仓库 checkout 中运行 `CI=true pnpm run prepare:primary-runtime --target linux-x64 --output /tmp/dsh-office`，会生成 `primary-runtime/` 和 `office-skills/`。[共享下载锁](../../../scripts/primary-runtime/lock.json)还覆盖 `linux-arm64`、`mac-arm64`、`mac-x64` 和 `win-x64`。payload 只携带 Python；`--cache` 选择经过哈希校验的归档缓存。入口仅对本机目标执行解释器与 Office 读写检查。跨目标构建必须在部署前到目标主机执行这些检查。
 
 容器可将这两个目录复制到不可变镜像层，并将 `DSH_PRIMARY_RUNTIME` 设为 `primary-runtime/` 的绝对路径。SDK 原位查询该 payload。Desktop 使用同一构建器，并保留 Harness-home 安装与签名检查。
 
@@ -100,7 +102,7 @@ kind: "package-reference"
 
 #### 模型看到什么
 
-一个 JSON 对象：绝对路径 `python` 与 `pythonPackages`、来自 `runtime.json` 的 `pythonDistributions`，以及 payload 声明了才有的 `node`、`nodePackages` 与 `pnpm`。重复调用返回同一对象。
+一个 JSON 对象：绝对路径 `python` 与 `pythonPackages`、来自 `runtime.json` 的 `pythonDistributions`，承载方配置了才有的 `node` 与 `pnpm`，以及 payload 清单声明了才有的 `node`、`nodePackages` 与 `pnpm`。重复调用返回同一对象。
 
 #### Token 影响
 

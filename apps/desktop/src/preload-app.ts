@@ -80,10 +80,12 @@ if (location.protocol === `${SCHEME}:` && location.hostname === 'app') {
   contextBridge.exposeInMainWorld('__DSH_HOST_PATHS__', {
     pathFor: (file: File) => webUtils.getPathForFile(file),
   })
-  // The workspace account block reads the signed-in panel entitlement; the
-  // operation returns null when no session is signed in or the panel failed.
+  // The workspace account block reads the signed-in panel entitlement and
+  // usage; each operation returns null when no session is signed in or the panel failed.
   contextBridge.exposeInMainWorld('dshDesktopAccount', {
     read: () => ipcRenderer.invoke(DESKTOP_IPC.tflowAccount) as Promise<unknown>,
+    usage: () => ipcRenderer.invoke(DESKTOP_IPC.tflowUsage) as Promise<unknown>,
+    signOut: () => ipcRenderer.invoke(DESKTOP_IPC.tflowSignOut) as Promise<void>,
   })
   contextBridge.exposeInMainWorld('dshDesktopBoot', {
     ready: () => ipcRenderer.invoke(DESKTOP_IPC.boot) as Promise<unknown>,

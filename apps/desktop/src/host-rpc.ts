@@ -13,7 +13,7 @@ import { randomUUID } from 'node:crypto'
 
 /** One unary Host method call. */
 export interface HostInvoke {
-  (request: { namespace: string, method: string, args: Record<string, unknown> }): Promise<unknown>
+  (request: { namespace: string; method: string; args: Record<string, unknown> }): Promise<unknown>
 }
 
 /** A JSON object, as every Host reply this module reads must be. */
@@ -46,7 +46,7 @@ export async function connectHostRpc(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ type: 'client-request', rpcId, method, payload: { args: request.args } }),
     })
-    if (!response.ok) throw new Error('desktop host: Web request failed')
+    if (!response.ok) throw new Error(`desktop host: Web request ${method} failed with HTTP ${response.status}`)
     const envelope: unknown = await response.json()
     if (!isRecord(envelope) || envelope['type'] !== 'server-response' || envelope['rpcId'] !== rpcId
       || !isRecord(envelope['result']) || envelope['result']['ok'] !== true) {
@@ -116,13 +116,14 @@ function modelEntry(id: string): Record<string, unknown> {
  */
 export async function applyTFlowRoute(
   invoke: HostInvoke,
-  credentials: { readonly gatewayUrl: string, readonly modelKey: string, readonly panelUrl: string },
+  credentials: { readonly gatewayUrl: string; readonly modelKey: string; readonly panelUrl: string },
   modelIds: readonly string[],
 ): Promise<void> {
   await invoke({
-    namespace: PROVIDER_NAMESPACE,
+    namespace: 'settings',
     method: 'update',
     args: {
+      ns: PROVIDER_NAMESPACE,
       patch: {
         providers: {
           [TFLOW_PROVIDER]: {
@@ -144,17 +145,25 @@ export async function applyTFlowRoute(
 /**
  * Point the default selection at the first model the TFlow route serves.
  * @param invoke - Host RPC caller.
- * @throws Error when the route serves no model.
+ * @throws Error when the catalog reports a TFlow listing failure or the route serves no model.
  */
 async function applyDefaultModel(invoke: HostInvoke): Promise<void> {
-  const models = await invoke({ namespace: 'llm', method: 'listModels', args: { provider: TFLOW_PROVIDER } })
-  if (!Array.isArray(models)) throw new Error('desktop host: invalid model directory')
-  const first = models.find(entry => isRecord(entry) && typeof entry['id'] === 'string' && entry['id'] !== '')
+  const catalog = await invoke({ namespace: 'session', method: 'modelCatalog', args: {} })
+  if (!isRecord(catalog) || !Array.isArray(catalog['groups']) || !Array.isArray(catalog['failures'])) {
+    throw new Error('desktop host: invalid model directory')
+  }
+  const failure: unknown = catalog['failures'].find(item => isRecord(item) && item['id'] === TFLOW_PROVIDER)
+  if (isRecord(failure)) throw new Error(`desktop host: the TFlow route failed to list models: ${String(failure['message'])}`)
+  // The catalog omits a provider group that lists no models.
+  const group: unknown = catalog['groups'].find(item => isRecord(item) && item['id'] === TFLOW_PROVIDER)
+  const models: unknown[] = isRecord(group) && Array.isArray(group['models']) ? group['models'] : []
+  const first = models.map(entry => isRecord(entry) ? entry['id'] : undefined)
+    .find((id): id is string => typeof id === 'string' && id !== '')
   if (first === undefined) throw new Error('desktop host: the TFlow route serves no model')
   await invoke({
-    namespace: DEFAULT_MODEL_NAMESPACE,
+    namespace: 'settings',
     method: 'update',
-    args: { patch: { provider: TFLOW_PROVIDER, model: first['id'] as string }, expectedRevision: undefined },
+    args: { ns: DEFAULT_MODEL_NAMESPACE, patch: { provider: TFLOW_PROVIDER, model: first }, expectedRevision: undefined },
   })
 }
 
@@ -168,16 +177,16 @@ export async function revokeTFlowRoute(invoke: HostInvoke): Promise<void> {
   // stored key with no route is an unused secret the user cannot see.
   await invoke({ namespace: 'credentials', method: 'unset', args: { ref: MODEL_KEY_REF } })
   await invoke({
-    namespace: PROVIDER_NAMESPACE,
+    namespace: 'settings',
     method: 'mutate',
-    args: { ops: [{ op: 'unset', path: ['providers', TFLOW_PROVIDER] }], expectedRevision: undefined },
+    args: { ns: PROVIDER_NAMESPACE, ops: [{ op: 'unset', path: ['providers', TFLOW_PROVIDER] }], expectedRevision: undefined },
   })
   // The selection is blanked rather than removed: the namespace requires a
   // provider and a model, and a blank pair fails a request without pretending
   // some other provider can serve it.
   await invoke({
-    namespace: DEFAULT_MODEL_NAMESPACE,
+    namespace: 'settings',
     method: 'update',
-    args: { patch: { provider: '', model: '' }, expectedRevision: undefined },
+    args: { ns: DEFAULT_MODEL_NAMESPACE, patch: { provider: '', model: '' }, expectedRevision: undefined },
   })
 }

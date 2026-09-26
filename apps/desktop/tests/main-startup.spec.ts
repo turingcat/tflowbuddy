@@ -43,6 +43,9 @@ const harness = await vi.hoisted(async () => {
   let embeddedPolicy: unknown
   let closeWindowsOnQuit = false
   let updateState: DesktopUpdateState = { phase: 'idle' }
+  const readLocalePreference = vi.fn(async (): Promise<string | null> => localePreference)
+  /** No panel serves this suite; the sign-in form opens without captcha settings. */
+  const fetchPublicSettings = vi.fn(async (): Promise<never> => { throw new Error('desktop test: panel settings are unavailable') })
   const updateCheck = vi.fn(async (_manual?: boolean): Promise<DesktopUpdateState> => updateState)
   const updateDownload = vi.fn(async (_version: string): Promise<DesktopUpdateState> => updateState)
   const updateInstall = vi.fn(async (_version: string): Promise<DesktopUpdateState> => updateState)
@@ -91,6 +94,9 @@ const harness = await vi.hoisted(async () => {
       this.webContents.mainFrame.url = url
       if (url === 'dsh-app://app/') navigated.resolve()
     }
+    async loadFile(path: string) {
+      this.urls.push(path)
+    }
     static getAllWindows() { return windows.filter(window => !window.destroyed) }
     setMenu() {}
     getContentBounds() { return { x: 0, y: 0, width: 900, height: 650 } }
@@ -106,7 +112,6 @@ const harness = await vi.hoisted(async () => {
   class FakeHost {
     readonly updateTasks = vi.fn(async (_action: 'inspect' | 'lock' | 'unlock') => false)
     url = 'http://127.0.0.1:3080/?token=test'
-    fetch = vi.fn(async () => Response.json({ hasApiKey: true, writable: true, localePreference: null }))
     readonly ready = deferred()
     readonly exited = deferred()
     readonly stopping = deferred()
@@ -149,7 +154,7 @@ const harness = await vi.hoisted(async () => {
   })
   const credentialText = new Map<string, string>()
   /** Host RPC calls the shell made, in order. */
-  const rpcCalls: Array<{ namespace: string, method: string, args: Record<string, unknown> }> = []
+  const rpcCalls: Array<{ namespace: string; method: string; args: Record<string, unknown> }> = []
   let localePreference: string | null = null
   const nativeTheme = { themeSource: 'system', shouldUseDarkColors: false }
   return {
@@ -161,13 +166,14 @@ const harness = await vi.hoisted(async () => {
     rpcCalls,
     set localePreference(value: string | null) { localePreference = value },
     /** Stand-in for the authenticated Host RPC connection. */
-    connectHostRpc: async () => async (request: { namespace: string, method: string, args: Record<string, unknown> }) => {
+    connectHostRpc: async () => async (request: { namespace: string; method: string; args: Record<string, unknown> }) => {
       rpcCalls.push(request)
       if (request.namespace === 'credentials') return undefined
       if (request.namespace === 'llm-pi-ai') return { ns: 'llm-pi-ai', value: {}, revision: 1 }
       return undefined
     },
-    readLocalePreference: async () => localePreference,
+    readLocalePreference,
+    fetchPublicSettings,
     applyTFlowRoute: vi.fn(async () => undefined),
     revokeTFlowRoute: vi.fn(async () => undefined),
     ipcOn: vi.fn<(channel: string, listener: (event: { sender: unknown; senderFrame: unknown }, ...args: unknown[]) => void) => void>(),
@@ -200,6 +206,8 @@ const harness = await vi.hoisted(async () => {
       credentialText.clear()
       rpcCalls.length = 0
       localePreference = null
+      readLocalePreference.mockReset().mockImplementation(async () => localePreference)
+      fetchPublicSettings.mockReset().mockImplementation(async () => { throw new Error('desktop test: panel settings are unavailable') })
       windows.length = 0; hosts.length = 0; handlers.clear(); app.removeAllListeners()
       powerMonitor.removeAllListeners()
       app.isPackaged = true
@@ -265,6 +273,10 @@ vi.mock('../src/runtime-tree.ts', () => ({ readDesktopRuntime: () => ({ release:
 vi.mock('../src/paths.ts', () => ({
   resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }),
   resolveTFlowCredentialsPath: () => 'desktop-test-userdata/tflow-credentials.json',
+}))
+vi.mock('../src/tflow/protocol.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/tflow/protocol.ts')>(),
+  fetchPublicSettings: harness.fetchPublicSettings,
 }))
 vi.mock('../src/tflow/vault.ts', () => ({
   createElectronVault: () => ({
@@ -449,7 +461,7 @@ describe('desktop main startup', () => {
     const expected = JSON.parse(readFileSync(new URL('./expected/about-panel.json', import.meta.url), 'utf8')) as Record<string, unknown>
     expect({ menu: submenu.slice(0, 2), options: { ...options, iconPath: '<app icon>' } }).toEqual(expected[locale])
     expect(options.iconPath).toBe(packaged ? join('desktop-test-resources', 'icon.png')
-      : join('desktop-test-app', 'resources', 'icon-windows.png'))
+      : join('desktop-test-app', 'resources', 'icon-tflowbuddy.png'))
   })
 
   it('shows one explained startup login before Host readiness and joins concurrent checks without reopening it', async () => {
@@ -575,6 +587,8 @@ describe('desktop main startup', () => {
     try {
       vi.stubEnv('DSH_DESKTOP_UPDATE_JOURNAL_DIR', directory)
       await readyForUpdate()
+      // The workspace-ready record follows the credential check that opens sign-in.
+      await vi.waitFor(() => { expect(harness.windows).toHaveLength(2) })
       harness.publishUpdate({ phase: 'error', failedOperation: 'download', version: '1.2.3', message: 'ENOSPC secret-url' })
       const checkUpdates = applicationMenuItems().find(item => item.label === en.checkUpdatesMenu)!.click as () => void
       checkUpdates()
@@ -1313,7 +1327,9 @@ describe('desktop main startup', () => {
     expect(replacement.updateTasks.mock.calls).toEqual([['inspect']])
     expect(replacement.stop).not.toHaveBeenCalled()
     if (mandatory) {
-      expect(harness.windows).toHaveLength(1)
+      // The restored backend reopens sign-in; the blocked workspace window survives it.
+      await vi.waitFor(() => { expect(harness.windows).toHaveLength(2) })
+      expect(harness.windows[1]!.urls).toEqual(['desktop-test-app/renderer/welcome.html'])
       expect(harness.windows[0]!.isDestroyed()).toBe(false)
     }
   })
@@ -1350,7 +1366,9 @@ describe('desktop main startup', () => {
     expect(replacement.updateTasks.mock.calls).toEqual([['inspect']])
     expect(replacement.stop).not.toHaveBeenCalled()
     if (mandatory) {
-      expect(harness.windows).toHaveLength(1)
+      // The restored backend reopens sign-in; the blocked workspace window survives it.
+      await vi.waitFor(() => { expect(harness.windows).toHaveLength(2) })
+      expect(harness.windows[1]!.urls).toEqual(['desktop-test-app/renderer/welcome.html'])
       expect(harness.windows[0]!.isDestroyed()).toBe(false)
     }
   })
@@ -1555,7 +1573,9 @@ describe('desktop main startup', () => {
     })
     expect(harness.hosts[0]!.environment).toBe(process.env)
     expect(harness.hosts[0]!.start).toHaveBeenCalledTimes(1)
-    expect(harness.windows).toHaveLength(1)
+    // No credential is stored, so sign-in becomes the first visible window and
+    // the prepared workspace window stays on its loading document.
+    await vi.waitFor(() => { expect(harness.windows).toHaveLength(2) })
     expect(window.urls).toEqual(['dsh-app://app/'])
   })
 
@@ -1590,20 +1610,20 @@ describe('desktop main startup', () => {
   })
 
   it('keeps recovery visible when the backend fails during the language preference read', async () => {
-    const preferences = Promise.withResolvers<Response>()
+    const preferences = Promise.withResolvers<string | null>()
     await import('../src/main.ts')
     await harness.preparing.promise
     harness.prepared.resolve()
     await harness.hostStarted.promise
     const host = harness.hosts[0]!
-    host.fetch.mockReturnValueOnce(preferences.promise)
+    harness.readLocalePreference.mockReturnValueOnce(preferences.promise)
     const startup = expect(Promise.resolve(invoke(DESKTOP_IPC.boot))).rejects.toThrow('Desktop Host is unavailable')
     host.ready.resolve()
-    await vi.waitFor(() => { expect(host.fetch).toHaveBeenCalledOnce() })
+    await vi.waitFor(() => { expect(harness.readLocalePreference).toHaveBeenCalledOnce() })
     host.exited.resolve()
     host.onFailure!(new Error('backend exited during startup preferences'))
     await harness.dialogShown.promise
-    preferences.resolve(Response.json({ hasApiKey: true, localePreference: null }))
+    preferences.resolve(null)
     await startup
     expect(harness.windows[0]!.urls).not.toContain('http://127.0.0.1:3080/?token=test')
     const failureDialog = harness.dialog.showMessageBox.mock.calls[0]![0] as { detail: string }

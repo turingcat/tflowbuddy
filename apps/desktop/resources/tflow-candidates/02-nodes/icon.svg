@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">TFlow nodes mark</title>
+  <desc id="desc">A connected three-node T mark for model routing.</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f4fffd"/><stop offset="1" stop-color="#d9efff"/></linearGradient><linearGradient id="line" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f9f93"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <path d="M238 300h548" fill="none" stroke="#2563eb" stroke-width="66" stroke-linecap="round"/>
+  <path d="M512 300v426" fill="none" stroke="#2563eb" stroke-width="66" stroke-linecap="round"/>
+  <path d="M238 300 350 700M786 300 674 700" fill="none" stroke="#0f9f93" stroke-width="22" stroke-linecap="round" stroke-opacity=".65"/>
+  <circle cx="238" cy="300" r="62" fill="#0f9f93"/><circle cx="786" cy="300" r="62" fill="#2563eb"/><circle cx="512" cy="726" r="62" fill="#12334a"/>
+  <circle cx="238" cy="300" r="20" fill="#eafffb"/><circle cx="786" cy="300" r="20" fill="#eff6ff"/><circle cx="512" cy="726" r="20" fill="#d9fffa"/>
+</svg>

@@ -1,6 +1,14 @@
 /** TFlow account settings copy, owned by this feature. */
 export const en = {
   nav: 'Account',
+  usage: 'Usage',
+  usageSignInRequired: 'Sign in with your TFlow account to see your usage.',
+  usageFailed: 'Could not read the usage. Try again.',
+  today: 'Today',
+  total: 'All time',
+  requests: 'Requests',
+  tokens: 'Tokens',
+  cost: 'Charged',
   settings: 'Settings',
   signedInAs: 'Signed in as {name}',
   signInRequired: 'Sign in with your TFlow account to see your balance.',
@@ -16,6 +24,7 @@ export const en = {
   weekly: 'Weekly',
   monthly: 'Monthly',
   amountUnavailable: '—',
+  signOut: 'Sign out',
   manage: 'Manage on the TFlow website',
   notSupported: 'Not available in the desktop app',
 } as const
@@ -26,6 +35,14 @@ export type TFlowAccountKey = keyof typeof en
 /** Chinese TFlow account copy; the product's audience reads this by default. */
 export const zh: Record<TFlowAccountKey, string> = {
   nav: '账号与余额',
+  usage: '用量',
+  usageSignInRequired: '登录 TFlow 账号后即可查看用量。',
+  usageFailed: '未能读取用量，请重试。',
+  today: '今日',
+  total: '累计',
+  requests: '请求数',
+  tokens: 'Token 数',
+  cost: '消费金额',
   settings: '设置',
   signedInAs: '已登录：{name}',
   signInRequired: '登录 TFlow 账号后即可查看余额。',
@@ -41,6 +58,7 @@ export const zh: Record<TFlowAccountKey, string> = {
   weekly: '周',
   monthly: '月',
   amountUnavailable: '—',
+  signOut: '退出登录',
   manage: '前往 TFlow 网站管理账号',
   notSupported: '桌面端不提供此操作',
 }

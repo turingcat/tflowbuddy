@@ -74,7 +74,7 @@ export interface TFlowSignIn {
    * @param input - account address, password, and captcha proof.
    * @returns the state the attempt settled into.
    */
-  start(input: { email: string, password: string, captchaProof: string }): Promise<TFlowAuthState>
+  start(input: { email: string; password: string; captchaProof: string }): Promise<TFlowAuthState>
   /**
    * Answer the panel's second factor.
    * @param code - six-digit authenticator code.
@@ -115,7 +115,7 @@ export interface TFlowSignIn {
 interface Pending {
   settings: TFlowPublicSettings
   session: TFlowSession
-  challenge?: { tempToken: string, maskedEmail?: string }
+  challenge?: { tempToken: string; maskedEmail?: string }
 }
 
 /** Turn any thrown value into the state the surface renders. */
@@ -273,6 +273,16 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
         await options.effects.clear()
         await options.effects.revoke()
         return publish({ kind: 'signed-out' })
+      }
+      // A new process holds no advertised catalog, and the refresh republishes
+      // the route with it; an empty list is a route the provider refuses. The
+      // stored key re-reads the catalog, as provisioning does.
+      try {
+        const models = await listModels({ ...request, gatewayUrl: credentials.gatewayUrl }, credentials.modelKey)
+        if (models.length === 0) throw new TFlowProtocolError('protocol', 'TFlow 网关未返回可用模型')
+        advertised = models.map(model => model.id)
+      } catch (error) {
+        return publish(failureState(error))
       }
       publish({ kind: 'authenticated', credentials })
       return this.refresh()
