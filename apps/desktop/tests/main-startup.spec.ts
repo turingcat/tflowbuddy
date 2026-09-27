@@ -274,6 +274,7 @@ vi.mock('../src/paths.ts', () => ({
   resolveDesktopHome: () => 'desktop-test-home',
   resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }),
   resolveTFlowCredentialsPath: () => 'desktop-test-userdata/tflow-credentials.json',
+  resolveTFlowGroupPreferencePath: () => 'desktop-test-userdata/tflow-group.json',
 }))
 vi.mock('../src/tflow/protocol.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../src/tflow/protocol.ts')>(),
@@ -367,6 +368,7 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   vi.spyOn(console, 'info').mockImplementation(() => {})
   vi.stubEnv('DSH_DESKTOP_PNPM_ENTRY', 'test-pnpm')
+  vi.stubEnv('DSH_CLIENT_VERSION', '1.0.0')
   vi.stubEnv('DSH_DESKTOP_DSH_DIR', 'test-runtime')
   vi.stubGlobal('process', { ...process, platform: 'win32', arch: 'x64', resourcesPath: 'desktop-test-resources' })
   vi.stubEnv('DSH_DESKTOP_HOST_INSPECT_PORT', undefined)
@@ -460,7 +462,7 @@ describe('desktop main startup', () => {
     const submenu = applicationMenuItems()
     const options = harness.app.setAboutPanelOptions.mock.calls[0]![0]
     const expected = JSON.parse(readFileSync(new URL('./expected/about-panel.json', import.meta.url), 'utf8')) as Record<string, unknown>
-    expect({ menu: submenu.slice(0, 2), options: { ...options, iconPath: '<app icon>' } }).toEqual(expected[locale])
+    expect({ menu: submenu.slice(0, 2), options: { ...options, iconPath: '<app icon>' } }).toEqual(expected[`${platform}:${locale}`])
     expect(options.iconPath).toBe(packaged ? join('desktop-test-resources', 'icon.png')
       : join('desktop-test-app', 'resources', 'icon-tflowbuddy.png'))
   })

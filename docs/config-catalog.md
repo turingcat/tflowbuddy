@@ -3937,7 +3937,7 @@ export interface Config {
 - `source`: [`packages/skill/tool-workspace-dependencies/src/index.ts:15`](../packages/skill/tool-workspace-dependencies/src/index.ts)
 
 ```ts config-catalog
-/** Payload location and optional installation directory. */
+/** Payload location, optional installation directory, and optional carrier-supplied Node.js and pnpm. */
 export interface Config {
   /** Payload directory carrying `runtime.json` and `dependencies/`. */
   readonly source: string
@@ -3947,6 +3947,13 @@ export interface Config {
    * which suits read-only carriers such as container image layers.
    */
   readonly root?: string
+  /**
+   * Absolute Node.js executable the carrier supplies instead of the payload, such as Desktop's
+   * Electron launcher. A payload that also ships Node.js fails the first call.
+   */
+  readonly node?: string
+  /** Absolute pnpm entry script run through {@link Config.node}; requires `node`. */
+  readonly pnpm?: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-tool-workspace-dependencies -->
@@ -4312,6 +4319,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@deepseek-ai/dsh-client-ui-schedule` | — | [`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-session` | — | [`packages/client/ui-session/src/index.ts`](../packages/client/ui-session/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings` | — | [`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts) |
+| `@deepseek-ai/dsh-client-ui-settings-account-tflow` | — | [`packages/client/ui-settings-account-tflow/src/index.ts`](../packages/client/ui-settings-account-tflow/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-agent-loop` | — | [`packages/client/ui-settings-agent-loop/src/index.ts`](../packages/client/ui-settings-agent-loop/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-general` | — | [`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts) |
 | `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` | — | [`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts) |

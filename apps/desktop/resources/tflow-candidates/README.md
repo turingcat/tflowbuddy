@@ -1,5 +1,7 @@
 # TFlow desktop brand candidates
 
+English | [中文](README.zh.md)
+
 These three candidates are retained as review assets. Candidate 03 is now selected and has been applied to the formal `apps/desktop/resources` files. Each folder contains an SVG source and PNG previews.
 
 The directions use the visual cues visible on `tflow.online`: a teal and blue interface palette, an API gateway that connects multiple model providers, and a short TFlow wordmark that must remain legible in a desktop rail and application icon.
