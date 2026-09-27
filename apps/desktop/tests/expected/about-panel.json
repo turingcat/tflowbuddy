@@ -27,7 +27,7 @@
   },
   "win32:zh-CN": {
     "menu": [
-      { "label": "关于 TFlowBuddy" },
+      { "label": "关于 TFlowBuddy", "role": "about" },
       { "type": "separator" }
     ],
     "options": {
@@ -40,7 +40,7 @@
   },
   "win32:en-US": {
     "menu": [
-      { "label": "About TFlowBuddy" },
+      { "label": "About TFlowBuddy", "role": "about" },
       { "type": "separator" }
     ],
     "options": {

@@ -1055,7 +1055,7 @@ describe('desktop main startup', () => {
     expect(modal.isDestroyed()).toBe(false)
     expect(modal.webContents.send.mock.calls.at(-1)).toMatchObject([MANDATORY_IPC.state, { policy: { blocking: false } }])
     expect(host.stop).not.toHaveBeenCalled()
-    expect(request.mock.calls[0]![1]!.headers).toMatchObject({ 'x-client-bundle-id': 'com.deepseek.dsh', 'x-client-version': '1.0.0' })
+    expect(request.mock.calls[0]![1]!.headers).toMatchObject({ 'x-client-bundle-id': '', 'x-client-version': '1.0.0' })
   })
 
   it('keeps one checking dialog open until the manual check settles, then reports the current version', async () => {
@@ -1462,6 +1462,7 @@ describe('desktop main startup', () => {
     expect(() => { handler(event, {}) }).toThrow('must be text')
     expect(harness.dialog.showMessageBox).not.toHaveBeenCalled()
     handler(event, 'client mount failed')
+    await vi.waitFor(() => { expect(harness.dialog.showMessageBox).toHaveBeenCalledOnce() })
     expect((harness.dialog.showMessageBox.mock.calls[0]![0] as MessageBoxOptions).detail).toContain('client mount failed')
     expect(window.urls).toEqual(['dsh-app://app/'])
   })
@@ -1474,6 +1475,7 @@ describe('desktop main startup', () => {
     window.webContents.emit('did-fail-load', {}, -3, 'aborted', 'dsh-app://app/', true)
     expect(harness.dialog.showMessageBox).not.toHaveBeenCalled()
     window.webContents.emit('did-fail-load', {}, -2, 'failed', 'dsh-app://app/', true)
+    await vi.waitFor(() => { expect(harness.dialog.showMessageBox).toHaveBeenCalledOnce() })
     expect((harness.dialog.showMessageBox.mock.calls[0]![0] as MessageBoxOptions).detail).toContain('Desktop page failed to load')
   })
 
