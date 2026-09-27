@@ -5,6 +5,7 @@ export interface DesktopElectronBuilderConfig {
   readonly appId: string
   readonly protocols: readonly [{ readonly name: string; readonly schemes: readonly string[] }]
   readonly productName: string
+  readonly electronLanguages: readonly ['en-US', 'zh-CN']
   readonly artifactName: string
   readonly directories: {
     readonly output: string
@@ -25,6 +26,8 @@ export interface DesktopElectronBuilderConfig {
  ...{ readonly from: string, readonly to: 'tray.ico' }[],
  ]
   readonly mac: {
+    readonly electronLanguages: readonly ['en', 'zh_CN']
+    readonly target: readonly ('dmg' | 'zip')[]
     readonly icon: string
     readonly extendInfo: { readonly NSMicrophoneUsageDescription: string }
     readonly identity: string | undefined

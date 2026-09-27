@@ -271,6 +271,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 })
 vi.mock('../src/runtime-tree.ts', () => ({ readDesktopRuntime: () => ({ release: { version: '1.0.0' } }) }))
 vi.mock('../src/paths.ts', () => ({
+  resolveDesktopHome: () => 'desktop-test-home',
   resolveDesktopPaths: () => ({ profile: 'desktop-test-profile' }),
   resolveTFlowCredentialsPath: () => 'desktop-test-userdata/tflow-credentials.json',
 }))
@@ -1571,7 +1572,8 @@ describe('desktop main startup', () => {
       primaryRuntime: join('desktop-test-resources', 'runtime', 'primary-runtime'),
       profile: 'desktop-test-profile',
     })
-    expect(harness.hosts[0]!.environment).toBe(process.env)
+    // The Host resolves profiles, sessions, and credentials from the edition's own home.
+    expect(harness.hosts[0]!.environment).toEqual({ ...process.env, DSH_HOME: 'desktop-test-home' })
     expect(harness.hosts[0]!.start).toHaveBeenCalledTimes(1)
     // No credential is stored, so sign-in becomes the first visible window and
     // the prepared workspace window stays on its loading document.

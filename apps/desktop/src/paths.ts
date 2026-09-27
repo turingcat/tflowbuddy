@@ -1,9 +1,32 @@
 /** Filesystem ownership for the Electron-managed desktop installation. */
 
+import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { DSH_HOME_ENV, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 
-/** Stable desktop installation paths under the shared Harness home. */
+/** Directory name of the TFlowBuddy Harness home under the OS home. */
+const TFLOWBUDDY_HOME_DIR_NAME = '.tflowbuddy'
+
+/**
+ * Resolve the Harness home the TFlowBuddy Host runs against.
+ *
+ * The packaged application always uses `~/.tflowbuddy`, so its profiles,
+ * sessions, workspaces, and credential document never share the `~/.dsh` home
+ * of an npm-installed dsh, even when `$DSH_HOME` names that home. An unpackaged
+ * run honours a non-blank `$DSH_HOME`, which the development launchers set to
+ * a checkout-local home.
+ * @param packaged - whether Electron runs the packaged application.
+ * @param env - environment read for the development `$DSH_HOME`.
+ * @returns the absolute Harness home path.
+ */
+export function resolveDesktopHome(packaged: boolean, env: NodeJS.ProcessEnv = process.env): string {
+  const development = packaged ? undefined : env[DSH_HOME_ENV]
+  return resolveDshHome(development !== undefined && development.trim().length > 0
+    ? development
+    : join(homedir(), TFLOWBUDDY_HOME_DIR_NAME))
+}
+
+/** Stable desktop installation paths under the TFlowBuddy Harness home. */
 export interface DesktopPaths {
   readonly profile: string
   readonly lock: string
@@ -11,10 +34,10 @@ export interface DesktopPaths {
 
 /**
  * Resolve every Electron-owned path without changing the shared data roots.
- * @param dshHome - Harness home shared with npm-installed dsh.
+ * @param dshHome - Harness home from {@link resolveDesktopHome}.
  * @returns immutable desktop path set.
  */
-export function resolveDesktopPaths(dshHome: string = resolveDshHome()): DesktopPaths {
+export function resolveDesktopPaths(dshHome: string): DesktopPaths {
   return {
     profile: join(dshHome, 'profiles', 'desktop'),
     lock: join(dshHome, 'profiles', 'desktop', 'lock'),

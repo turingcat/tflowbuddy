@@ -1,12 +1,6 @@
 /**
  * Sidebar account launcher for the TFlow edition.
- *
- * The DeepSeek edition's menu is unreachable here because its Host account
- * service is disabled, and this product has no in-app sign-out to offer: the
- * session belongs to the shell, and the account's own management lives on the
- * TFlow website. The menu therefore offers settings and the website, and
- * reports the account's state without pretending to own it.
- *
+ * Settings owns the usage page; account management and sign-out delegate to the desktop shell.
  * @module
  */
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -38,7 +32,6 @@ export function TFlowAccountMenu({ wide, openSettings, useAccount, refresh, mana
       </button>}
       items={[
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} /> },
-        { id: 'usage', label: t('usage') },
         { id: 'manage', label: t('manage'), icon: <IconRightUpOutlineRegular size={16} /> },
         { id: 'sign-out', label: t('signOut') },
       ]}
@@ -46,7 +39,6 @@ export function TFlowAccountMenu({ wide, openSettings, useAccount, refresh, mana
       onSelect={(id) => {
         setOpen(false)
         if (id === 'settings') openSettings()
-        else if (id === 'usage') openSettings()
         else if (id === 'manage') manage()
         else void signOut()
       }} />

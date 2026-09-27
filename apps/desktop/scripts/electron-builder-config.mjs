@@ -108,6 +108,7 @@ export function createElectronBuilderConfig(
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
     productName: desktopEdition.productName,
+    electronLanguages: ['en-US', 'zh-CN'],
     artifactName: `${desktopEdition.artifactStem}-\${version}-\${os}-\${arch}.\${ext}`,
     directories: { output: unsigned ? buildPaths.unsignedArtifacts : buildPaths.artifacts },
     asar: true,
@@ -146,6 +147,7 @@ export function createElectronBuilderConfig(
  ...(packagesWindows ? [{ from: fileURLToPath(new URL('../resources/tray-windows.ico', import.meta.url)), to: 'tray.ico' }] : []),
  ],
     mac: {
+      electronLanguages: ['en', 'zh_CN'],
       icon: iconResource('icns'),
       category: 'public.app-category.developer-tools',
       // An unsigned local build has no Developer ID; requiring one would fail
@@ -161,7 +163,7 @@ export function createElectronBuilderConfig(
       // by their enclosing bundle.
       signIgnore: ['/Contents/Resources/app\\.asar\\.unpacked/dsh(?:/|$)', '/Contents/Resources/runtime/primary-runtime(?:/|$)', '\\.pak$'],
       notarize: !unsigned,
-      target: ['dmg', 'zip'],
+      target: unsigned ? ['dmg'] : ['dmg', 'zip'],
     },
     dmg: {
       sign: !unsigned,

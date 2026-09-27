@@ -49,11 +49,16 @@ describe('desktop edition manifest', () => {
     expect(resolveDesktopAppId({})).toBe(desktopEdition.bundleId)
     expect(config.extraMetadata.dshDesktopAppId).toBe(desktopEdition.bundleId)
     expect(config.productName).toBe(desktopEdition.productName)
+    expect(config.electronLanguages).toEqual(['en-US', 'zh-CN'])
+    expect(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))).toHaveProperty('version', '0.1.0')
+    expect(config.mac.electronLanguages).toEqual(['en', 'zh_CN'])
+    expect(config.mac.target).toEqual(['dmg'])
     expect(config.artifactName).toContain(desktopEdition.artifactStem)
     expect(config.protocols).toEqual([{ name: desktopEdition.protocolName, schemes: [desktopEdition.protocol] }])
     expect(config.mac.icon).toMatch(new RegExp(`/resources/${desktopEdition.iconStem}\\.icns$`, 'u'))
     expect(config.win.icon).toMatch(new RegExp(`/resources/${desktopEdition.iconStem}\\.ico$`, 'u'))
-    expect(config.extraResources).toContainEqual({ from: expect.stringMatching(new RegExp(`/resources/${desktopEdition.iconStem}\\.png$`, 'u')), to: 'icon.png' })
+    expect(config.extraResources.some(resource => resource.to === 'icon.png'
+      && new RegExp(`/resources/${desktopEdition.iconStem}\\.png$`, 'u').test(resource.from))).toBe(true)
     expect(config.dmg.title).toBe(desktopEdition.productName)
   })
 

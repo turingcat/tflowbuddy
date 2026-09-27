@@ -66,7 +66,7 @@ Node prepares the bundled interpreters and Python libraries without a system Pyt
 | Release identity | The shell API, Web client, backend, and plugin graph are qualified as one combination; independent versions would create untested combinations and ambiguous update availability. | Electron and `@deepseek-ai/dsh` always have the same exact version. A dsh upgrade is a Desktop release, even when the shell code is unchanged. |
 | Runtime | The application must run without a system Node.js or pnpm installation. | dsh runs under Electron with `ELECTRON_RUN_AS_NODE=1` and `--expose-internals` and every package operation uses the bundled pnpm. Package-manager configuration and the Host environment follow the user's settings. Package scripts use a `node` shell launcher that forwards to Electron. |
 | Package sources | Core installation at startup adds work even when offline. | `app.asar/dsh` carries a complete production dependency tree; the profile installs only external plugins. |
-| State ownership | Sharing executable dependency graphs would let CLI and Desktop change each other's dsh, Cordis, plugin, or native-module versions, while two desktop processes could race on the same profile. | Electron acquires its process-lifetime single-instance lock before any profile access and exclusively owns `$DSH_HOME/profiles/desktop` plus its package-manager state. CLI and Desktop share supported product data under `$DSH_HOME`, but never executable packages, plugin activation, lockfiles, or `node_modules`. |
+| State ownership | Sharing executable dependency graphs would let CLI and Desktop change each other's dsh, Cordis, plugin, or native-module versions, while two desktop processes could race on the same profile. | Electron acquires its process-lifetime single-instance lock before any profile access and exclusively owns `$DSH_HOME/profiles/desktop` plus its package-manager state. The packaged TFlowBuddy Host runs with `DSH_HOME=~/.tflowbuddy`, ignoring an inherited `DSH_HOME`, so it shares no product data, executable packages, plugin activation, lockfiles, or `node_modules` with CLI dsh in `~/.dsh`. |
 | Transport | Web serving and authentication share one implementation. | Electron loads packaged Web assets; the Host supplies boot injections and authenticated APIs. |
 | Plugin changes | Desktop and Web need the same installation and activation behavior. | The main application uses the shared Web Plugin Manager and bundled pnpm. |
 | Updates | Independent shell and dsh updates would recreate version splits, while unchanged shell blocks should not require a complete transfer. | The Electron shell, matching dsh runtime and pnpm form one signed update unit. Platform update artifacts may reuse unchanged blocks, but runtime version selection never splits from the Desktop release. |
@@ -156,6 +156,10 @@ The welcome window follows system appearance with the design’s Platform light/
 <a id="release-versions"></a>
 
 ### Release versions
+
+TFlowBuddy starts at `0.1.0`; its first-party workspace packages use the same version so the bundled runtime matches the desktop shell. The [desktop release workflow](../../.github/workflows/release.yml) builds Windows x64 (`.exe`) and macOS Apple Silicon (`.dmg`) installers with Electron, pnpm, Python, and the application runtime included. A `v<version>` tag publishes both installers to GitHub Releases; a manual branch run retains build artifacts only. This workflow uses unsigned packaging: Windows installers have no publisher signature, and macOS applications are ad-hoc signed without Apple notarization. It does not publish separate CLI, Python SDK, native-addon, or npm products.
+
+TFlowBuddy maintains only Simplified Chinese and English. Application dictionaries and packaged Electron language resources are limited to those languages; unsupported system languages fall back to English.
 
 Before each Desktop packaging run, first confirm the complete version string with the current user. Check the selected deployment, dsh base version, retained release records, and published objects, then propose the exact version for approval. Do not start packaging until the user confirms that version; the deployment setting alone does not authorize a version choice.
 
@@ -438,7 +442,7 @@ An unpackaged Electron process uses `.desktop-build/development/project` under i
 
 - Release signing, notarization, update hosting, and previous-version installed-artifact qualification require the production release environment.
 - Dependency lifecycle scripts follow pnpm’s build permissions; Desktop provides no separate approval dialog.
-- The desktop shell shares sessions, settings, credentials, workspaces, and storage under `$DSH_HOME` with CLI dsh, while executable packages, plugin activation, and lockfiles remain separate.
+- The packaged desktop shell keeps sessions, settings, credentials, workspaces, and storage in `~/.tflowbuddy`, separate from CLI dsh in `~/.dsh`; an unpackaged run uses the `DSH_HOME` its development launcher sets.
 - Unpackaged startup on an Electron win32-arm64 host now succeeds, but the payload remains x64: the architecture check in `packages/skill/tool-workspace-dependencies/src/index.ts` compares the recorded payload architecture against the host `process.arch`, so the `load_workspace_dependencies` tool can still reject the primary runtime.
 
 The app-only `dshOnboarding.hasApiKey()` preload method returns the welcome backend’s current API-key presence boolean; native login and onboarding share credential discovery, and only the owned application main frame may invoke it.

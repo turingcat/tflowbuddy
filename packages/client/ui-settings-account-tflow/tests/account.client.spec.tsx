@@ -130,7 +130,7 @@ it('offers settings and the account site from the launcher, and shows the accoun
   expect(operations.refresh).toHaveBeenCalledOnce()
   expect(screen.getByRole('button', { name: zh.nav }).textContent).toBe('alice')
   fireEvent.click(screen.getByRole('button', { name: zh.nav }))
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([zh.settings, zh.usage, zh.manage, zh.signOut])
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([zh.settings, zh.manage, zh.signOut])
   await expect(`${screen.getByRole('menu').textContent}\n`).toMatchFileSnapshot('./expected/menu-zh.txt')
   fireEvent.click(screen.getByRole('menuitem', { name: zh.settings }))
   expect(openSettings).toHaveBeenCalledOnce()

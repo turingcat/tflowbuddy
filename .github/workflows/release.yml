@@ -1,180 +1,109 @@
-# Pack the dsh release sequence: every package under packages/ plus the apps/
-# entries, all on one version. The vendored framework and the native packages are
-# separate sequences with their own workflows and version lines.
-#
-# Pack and dependency-layout verification run without credentials on every pull
-# request and master push. Publication is a manual workflow_dispatch of
-# release-publish.yml from a dsh-v* tag.
-name: Release (dsh)
+name: Release TFlowBuddy Desktop
 
 on:
-  pull_request:
   push:
-    branches: [master]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  # Pack runs per ref so concurrent pull requests never displace each other.
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
-  PRIMARY_NODE_VERSION: '24'
   DSH_TELEMETRY_DISABLED: '1'
 
 jobs:
-  dependencies:
-    name: Dependency layout
-    # Persistent runners accept only trusted, credential-free rehearsals.
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-        && github.repository == 'deepseek-harness/deepseek-harness'
-        && github.actor != 'dependabot[bot]'
-        && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
-          || (github.event_name == 'pull_request'
-            && github.event.pull_request.head.repo.full_name == github.repository
-            && github.event.pull_request.head.repo.fork == false
-            && github.event.pull_request.user.login != 'dependabot[bot]'))
-        && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-        || 'ubuntu-24.04' }}
+  desktop:
+    name: Desktop / ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win-x64
+            runner: windows-2025
+            platform: win32
+            arch: x64
+            extension: exe
+          - target: mac-arm64
+            runner: macos-15
+            platform: darwin
+            arch: arm64
+            extension: dmg
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-          clean: true
-
-      - name: Configure runner-private caches
-        run: |
-          echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
-          echo "npm_config_devdir=${{ runner.temp }}/node-gyp" >> "$GITHUB_ENV"
-          echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
-
       - uses: pnpm/action-setup@v4
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-
       - uses: actions/setup-node@v6
         with:
-          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          node-version: '24'
           package-manager-cache: false
-
-      - name: Configure pnpm store path
-        id: pnpm-store
+      - name: Verify release version and build host
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          store_root="$HOME/.local/share/pnpm/store"
-          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
-          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
-          echo "path=$store_path" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache/restore@v4
-        if: runner.environment == 'github-hosted'
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
-
-      - name: Install (immutable)
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const readVersion = path => JSON.parse(readFileSync(path, 'utf8')).version;
+          const version = readVersion('apps/desktop/package.json');
+          if (version !== readVersion('package.json')) throw new Error('Desktop and workspace versions differ');
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
+            throw new Error(`Release tag must be v${version}`);
+          }
+          if (process.platform !== process.env.TARGET_PLATFORM || process.arch !== process.env.TARGET_ARCH) {
+            throw new Error('Build host does not match the desktop target');
+          }
+          const suffix = process.platform === 'win32' ? 'windows' : 'macos';
+          writeFileSync(`apps/desktop/.env.${suffix}`, 'DSH_DESKTOP_NPM_REGISTRY=https://registry.npmjs.org\n');
+          JS
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Verify dependency policy
-        run: pnpm run verify-package-dependencies
-
-      - name: Verify npm install layout
-        run: pnpm run verify-npm-install-layout
-
-  pack:
-    name: Pack npm tarballs
-    # Persistent runners accept only trusted, credential-free rehearsals.
-    runs-on: >-
-      ${{ vars.DSH_CI_FAILOVER_LINUX == 'selfhosted'
-        && github.repository == 'deepseek-harness/deepseek-harness'
-        && github.actor != 'dependabot[bot]'
-        && ((github.event_name == 'push' && github.ref == 'refs/heads/master')
-          || (github.event_name == 'pull_request'
-            && github.event.pull_request.head.repo.full_name == github.repository
-            && github.event.pull_request.head.repo.fork == false
-            && github.event.pull_request.user.login != 'dependabot[bot]'))
-        && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
-        || 'ubuntu-24.04' }}
-    steps:
-      # Complete history: the release scripts read tags.
-      - uses: actions/checkout@v6
+      - name: Package desktop with bundled runtime
+        run: pnpm --dir apps/desktop run package ${{ matrix.target }} --unsigned
+      - name: Upload desktop installer
+        uses: actions/upload-artifact@v4
         with:
-          fetch-depth: 0
-          persist-credentials: false
-          clean: true
-
-      - name: Configure runner-private caches
-        run: |
-          echo "NODE_COMPILE_CACHE=${{ runner.temp }}/node-compile-cache" >> "$GITHUB_ENV"
-          echo "npm_config_devdir=${{ runner.temp }}/node-gyp" >> "$GITHUB_ENV"
-          echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
-
-      - uses: pnpm/action-setup@v4
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.PRIMARY_NODE_VERSION }}
-          package-manager-cache: false
-
-      - name: Configure pnpm store path
-        id: pnpm-store
-        run: |
-          store_root="$HOME/.local/share/pnpm/store"
-          echo "PNPM_CONFIG_STORE_DIR=$store_root" >> "$GITHUB_ENV"
-          store_path=$(PNPM_CONFIG_STORE_DIR="$store_root" pnpm store path --silent)
-          echo "path=$store_path" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache/restore@v4
-        if: runner.environment == 'github-hosted'
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-node-${{ env.PRIMARY_NODE_VERSION }}-pnpm-
-
-      - name: Install (immutable)
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify release version
-        run: pnpm run release:verify --family dsh
-
-      - name: Build
-        run: pnpm run build:official
-
-      # Concurrency here is rehearsal-only: the credentialed publish workflows
-      # invoke release:pack without the flag and keep the strictly serial path.
-      - name: Pack release tarballs
-        run: pnpm run release:pack --family dsh --out dist/npm --concurrency 8
-
-      # The harness packages declare the vendored framework as a peer, and this
-      # verification must not depend on the registry already carrying matching
-      # versions — one pull request may bump both families before either
-      # publishes — so it installs that family's pack output too. Only dist/npm
-      # is published.
-      - name: Pack the vendored framework for verification
-        run: pnpm run release:pack --family vendor --out dist/npm-vendor --concurrency 8
-
-      # dsh-sandbox-local declares the Landlock entry as a runtime dependency, so
-      # the verification needs its tarball. Its platform packages stay out: they
-      # are optional, and building them needs a musl toolchain per architecture.
-      - name: Pack the Landlock entry for verification
-        run: |
-          pnpm --dir native/system run build:ts
-          pnpm --dir native/system/packages/entry pack --pack-destination "$PWD/dist/npm-landlock"
-
-      - name: Verify packed install
-        run: pnpm run release:verify-packed-install --family dsh --from dist/npm --from dist/npm-vendor --from dist/npm-landlock
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dsh-npm-tarballs
-          path: dist/npm/*
+          name: tflowbuddy-${{ matrix.target }}
+          path: apps/desktop/.desktop-build/targets/${{ matrix.target }}/unsigned-artifacts/tflowbuddy-*.${{ matrix.extension }}
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
+
+  publish:
+    name: Publish desktop installers
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: desktop
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tflowbuddy-*
+          path: installers
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          installers=(installers/tflowbuddy-*.exe installers/tflowbuddy-*.dmg)
+          if [ "${#installers[@]}" -ne 2 ]; then
+            echo 'Expected one Windows x64 installer and one macOS ARM64 disk image' >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${installers[@]}"
+          else
+            gh release create "$RELEASE_TAG" "${installers[@]}" --verify-tag --generate-notes --title "TFlowBuddy ${RELEASE_TAG#v}"
+          fi

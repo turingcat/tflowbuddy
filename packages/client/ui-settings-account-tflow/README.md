@@ -26,6 +26,8 @@ The package activates only inside a renderer the Electron shell loaded, identifi
 <a id="use-this-package"></a>
 ## Use this package
 
+The username menu offers Settings, account management, and sign-out. Usage is available inside Settings only.
+
 Mount this plugin in a browser roster that the desktop application loads. It contributes an account page (`tflow-account`) and a usage page (`tflow-usage`) through `settings.section`, and a sidebar launcher through `settings.launcher` that shows the signed-in username and starts the account read when it mounts.
 
 The launcher registers at priority 1. `settings.launcher` is a single-cell slot and two registrations at the same priority are refused, so the higher priority leaves the DeepSeek edition's launcher intact where that edition composes it, and renders this one where it does not. The TFlow edition's profile overlay disables that launcher's row.
@@ -65,7 +67,6 @@ No model request prefix changes.
 - The surface reads the account and the usage once per mount and on demand. It does not poll: the shell's account read reaches the TFlow panel, and a background poll would spend panel requests on a value the user is not looking at.
 - Balance and subscription are both rendered only when the shell reports them. The panel's own notion of a group with no subscription is reported as "no subscription for this group" rather than as a zero balance.
 - The subscription display covers the daily, weekly, and monthly windows the panel reports. A window the panel omits is not shown, and no allowance is computed locally.
-- Sign-out is not offered here. The session belongs to the Electron shell, and this product has no signed-out workspace to return to; a user who needs to change account does so by signing in again.
 - The package renders in a plain browser renderer's roster without contributing anything, which the registration spec covers. Reusing it outside the desktop shell would require a bridge of the same shape.
 
 <a id="dev-note"></a>

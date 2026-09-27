@@ -5,6 +5,8 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-client-ui-primitives
 
+`TFlowLogo` renders the decorative square TFlow app badge with its embedded colors; `size` sets both dimensions in pixels. The sidebar uses it in expanded and collapsed layouts, including the official brand slot.
+
 English | [中文](README.zh.md)
 
 ## Summary

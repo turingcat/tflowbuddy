@@ -5,6 +5,8 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-client-ui-primitives
 
+`TFlowLogo` 使用内置配色渲染装饰性的正方形 TFlow 应用徽标；`size` 以像素设置宽高。侧栏的展开和收起布局均使用该徽标，官方品牌插槽也使用它。
+
 [English](README.md) | 中文
 
 ## 概述
