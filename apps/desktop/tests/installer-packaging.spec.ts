@@ -1,5 +1,5 @@
 import { tmpdir } from 'node:os'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { Arch, Platform } from 'electron-builder'
 import { Packager } from 'app-builder-lib'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,21 @@ vi.mock('node:child_process', async (importOriginal) => {
 })
 
 describe('installer preparation preserves application dependencies', () => {
+  it('defines every installer message in English and Simplified Chinese', () => {
+    const directory = new URL('../installer/', import.meta.url)
+    const sources = [new URL('../scripts/installer.nsh', import.meta.url),
+      ...readdirSync(directory).filter(name => name.endsWith('.nsh')).map(name => new URL(name, directory))]
+    const keys = new Set(sources.flatMap(source =>
+      [...readFileSync(source, 'utf8').matchAll(/\$\((INSTALLER_[A-Z_]+)\)/gu)].map(match => match[1]!)))
+    const strings = readFileSync(new URL('strings.nsh', directory), 'utf8')
+    expect(keys.size).toBeGreaterThan(0)
+    for (const key of keys) {
+      for (const language of ['ENGLISH', 'SIMPCHINESE']) {
+        expect(strings, `${key} in ${language}`).toContain(`LangString ${key} \${LANG_${language}} "`)
+      }
+    }
+  })
+
   it.each(['win32', 'darwin'] as const)('omits upstream policy metadata on %s', async (platform) => {
     const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
     const config = createElectronBuilderConfig({ DSH_DESKTOP_APP_ID: 'com.example.installer',
