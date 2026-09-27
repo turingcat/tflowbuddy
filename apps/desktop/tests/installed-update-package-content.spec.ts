@@ -63,9 +63,7 @@ async function fixture(body: (context: {
     await prepareInstalledUpdateApplication(manifest, source)
     await cp(join(run.root, 'application/files'), source, { recursive: true })
     await writeFile(join(source, 'package.json'), JSON.stringify({ name: `dsh-update-test-${run.id}`, version,
-      dshDesktopAppId: run.appId, main: 'qualification-bootstrap.mjs', type: 'module',
-      dshMandatoryUpdatePolicy: { origin: 'https://policy.example.com', allowedPageOrigins: ['https://policy.example.com'],
-        authentication: 'feishu-test', allowedAuthOrigins: ['https://login.example.com'] } }))
+      dshDesktopAppId: run.appId, main: 'qualification-bootstrap.mjs', type: 'module' }))
     for (const name of ['electron-updater', 'semver']) {
       await mkdir(join(source, 'node_modules', name), { recursive: true })
       await cp(require.resolve(`${name}/package.json`), join(source, 'node_modules', name, 'package.json'))
@@ -110,7 +108,7 @@ describe('installed update archive contents', () => {
     }, version)
   })
 
-  it.each(['name', 'version', 'dshDesktopAppId', 'main', 'type', 'dshMandatoryUpdatePolicy'])(
+  it.each(['name', 'version', 'dshDesktopAppId', 'main', 'type'])(
     'rejects mismatched packaged %s', async (field) => {
       await fixture(async ({ manifest, source, payload, version, seal }) => {
         const path = join(source, 'package.json')
@@ -119,7 +117,7 @@ describe('installed update archive contents', () => {
         await writeFile(path, JSON.stringify(data))
         await seal()
         await expect(verifyInstalledUpdatePackageContent(manifest, version, payload, publisher))
-          .rejects.toThrow(field === 'dshMandatoryUpdatePolicy' ? 'desktop policy' : 'identity')
+          .rejects.toThrow('identity')
       })
     })
 

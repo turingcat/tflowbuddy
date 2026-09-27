@@ -21,7 +21,6 @@ import {
 import { resolveDesktopAutoUpdateConfig } from './desktop-auto-update-environment.mjs'
 import { resolveDesktopBuildCommit } from './desktop-build-commit.mjs'
 import { resolveDesktopBuildVersion } from './desktop-build-version.mjs'
-import { resolveDesktopPolicyEnvironment } from './desktop-policy-environment.mjs'
 import { desktopTargetBuildPaths, resolveDesktopBuildTarget } from './desktop-build-paths.mjs'
 import { installWindowsDirectoryInstaller } from './windows-directory-installer.mjs'
 import { preserveWindowsRuntimeSignature, signWindowsCode } from './windows-runtime-signature.mjs'
@@ -49,7 +48,6 @@ export function createElectronBuilderConfig(
   preparedRuntimeVersion = undefined,
 ) {
   const appId = resolveDesktopAppId(env)
-  const policy = resolveDesktopPolicyEnvironment(env)
   const targetPlatform = env.DSH_DESKTOP_TARGET_PLATFORM
   const resolvedPlatform = targetPlatform ?? hostPlatform
   const resolvedArch = env.DSH_DESKTOP_TARGET_ARCH ?? hostArch
@@ -103,7 +101,6 @@ export function createElectronBuilderConfig(
     protocols: [{ name: desktopEdition.protocolName, schemes: [desktopEdition.protocol] }],
     extraMetadata: {
       dshDesktopAppId: appId,
-      dshMandatoryUpdatePolicy: policy,
       ...buildVersion === productVersion ? {} : { version: buildVersion },
       ...packaged === undefined ? {} : { dshBuildCommit: packaged.commit, dshBuildDirty: packaged.dirty },
     },
@@ -176,9 +173,6 @@ export function createElectronBuilderConfig(
         primaryRuntimeDestination = join(context.appOutDir, 'resources', 'runtime', 'primary-runtime')
         dshDestination = join(context.appOutDir, 'resources', 'app.asar.unpacked', 'dsh')
       }
-      if (policy === undefined) return
-      const { resolveDesktopPolicyConfig } = await import('../lib/types/mandatory-update-policy.js')
-      resolveDesktopPolicyConfig(policy)
     },
     afterPack: async context => {
       const { verifyDesktopRuntime } = await import('../lib/types/runtime-tree.js')

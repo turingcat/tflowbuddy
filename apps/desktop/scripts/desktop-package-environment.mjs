@@ -7,7 +7,6 @@ import { parseEnv } from 'node:util'
 import { resolveDesktopAppId, resolveMacOSNotarizationEnvironment, resolveMacOSSigningEnvironment, resolveNpmRegistry } from './desktop-release-environment.mjs'
 import { resolveDesktopAutoUpdateConfig } from './desktop-auto-update-environment.mjs'
 import { createWindowsTokenSigner } from './windows-sign.mjs'
-import { resolveDesktopPolicyEnvironment } from './desktop-policy-environment.mjs'
 import { resolveMacOSPackageSettings } from './macos-package-settings.mjs'
 import { resolveWindowsSignatureCacheDirectory } from './windows-signature-cache-directory.mjs'
 import { resolveWindowsPackageSettings } from './windows-package-settings.mjs'
@@ -79,7 +78,6 @@ function requireReadableFile(environment, name) {
 export function validateDesktopPackageEnvironment(environment, target, options = {}) {
   resolveDesktopAppId(environment)
   resolveNpmRegistry(environment)
-  resolveDesktopPolicyEnvironment(environment)
   if (target.platform === 'darwin') resolveMacOSPackageSettings(environment)
   else resolveWindowsPackageSettings(environment)
   if (options.unsigned) return
