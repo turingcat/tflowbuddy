@@ -49,9 +49,12 @@ export async function smokeDesktopRuntime(
     }))
     writeFileSync(join(plugin, 'index.js'), `
 import { Context } from '@deepseek-ai/cordis'
-import { inspect, promisify } from 'node:util'
-import { execFile } from 'node:child_process'
+import { inspect } from 'node:util'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { readFile } from 'node:fs/promises'
+const require = createRequire(${JSON.stringify(join(root, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'))})
+const { execa } = await import(pathToFileURL(require.resolve('execa')).href)
 export function apply(ctx) {
   if (!(ctx instanceof Context)) throw new Error('desktop runtime: external plugin loaded another Cordis instance')
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/desktop-smoke',
@@ -64,9 +67,9 @@ export function apply(ctx) {
         if (json === undefined) throw new Error('Office skill did not supply CLI paths')
         const { libreofficeKit: { node, cli } } = JSON.parse(json)
         const options = { cwd: ${JSON.stringify(home)}, env: { ...process.env, PATH: '' }, timeout: 120_000 }
-        const capabilities = await promisify(execFile)(node, [cli, 'capabilities'], options)
+        const capabilities = await execa(node, [cli, 'capabilities'], options)
         const output = ${JSON.stringify(join(home, 'cli.pdf'))}
-        await promisify(execFile)(node, [cli, 'convert', '--input', ${JSON.stringify(join(home, 'input.docx'))}, '--output', output], options)
+        await execa(node, [cli, 'convert', '--input', ${JSON.stringify(join(home, 'input.docx'))}, '--output', output], options)
         response.end(JSON.stringify({ capabilities: JSON.parse(capabilities.stdout), pdf: (await readFile(output)).toString('base64') }))
       } catch (error) {
         response.statusCode = 500
