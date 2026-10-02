@@ -151,10 +151,15 @@ export function createElectronBuilderConfig(
       // packaging instead of producing a launchable application.
       forceCodeSigning: !unsigned,
       // macOS matches the application locale against this bundle, not Electron Framework resources.
-      extendInfo: { CFBundleLocalizations: ['en', 'zh_CN'], NSMicrophoneUsageDescription: `${desktopEdition.productName} uses your microphone to transcribe speech into message drafts.` },
+      extendInfo: {
+        CFBundleLocalizations: ['en', 'zh_CN'],
+        NSMicrophoneUsageDescription: `${desktopEdition.productName} uses your microphone to transcribe speech into message drafts.`,
+      },
       identity: unsigned ? '-' : macOSSigning?.signingIdentity,
       // Ad-hoc signing cannot carry the JIT entitlement a hardened runtime needs.
       hardenedRuntime: !unsigned,
+      entitlements: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
+      entitlementsInherit: fileURLToPath(new URL('./macos-entitlements.plist', import.meta.url)),
       // The runtime trees keep the signatures their own preparation produced: the release identity for a
       // signed build, the published vendor signatures for a local unsigned build. PAK resources are sealed
       // by their enclosing bundle.

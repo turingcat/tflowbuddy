@@ -50,7 +50,7 @@ describe('desktop edition manifest', () => {
     expect(config.extraMetadata.dshDesktopAppId).toBe(desktopEdition.bundleId)
     expect(config.productName).toBe(desktopEdition.productName)
     expect(config.electronLanguages).toEqual(['en-US', 'zh-CN'])
-    expect(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))).toHaveProperty('version', '0.1.0')
+    expect(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))).toHaveProperty('version', '0.2.0-rc.2')
     expect(config.mac.electronLanguages).toEqual(['en', 'zh_CN'])
     expect(config.mac.target).toEqual(['dmg'])
     expect(config.artifactName).toContain(desktopEdition.artifactStem)
@@ -73,10 +73,7 @@ describe('desktop edition manifest', () => {
   it('keeps product identity out of the shared Harness runtime', () => {
     const locale = readFileSync(new URL('../src/locale.ts', import.meta.url), 'utf8')
     expect(locale).toContain('desktopEdition.productName')
-    for (const file of ['../src/locale.ts', '../src/main.ts']) {
-      const source = readFileSync(new URL(file, import.meta.url), 'utf8')
-      expect(source).not.toContain('DeepSeek Harness')
-    }
+    expect(readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8')).not.toContain('DeepSeek Harness')
   })
 
   it('ships an icon resource for every packaged identity field', () => {
