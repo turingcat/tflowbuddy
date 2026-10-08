@@ -87,10 +87,9 @@ describe('master-only platform scheduling', () => {
     }))
   })
 
-  it('does not build standalone Python runtimes on master', () => {
+  it('keeps upstream master CI manual-only without standalone Python runtimes', () => {
     const master = workflow('ci-master.yml')
-    expect(master.on.push).toEqual({ branches: ['master'] })
-    expect(Object.keys(master.on).sort()).toEqual(['push', 'workflow_dispatch'])
+    expect(Object.keys(master.on).sort()).toEqual(['workflow_dispatch'])
     expect(master.jobs['python-runtime']).toBeUndefined()
   })
 

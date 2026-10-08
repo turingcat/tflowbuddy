@@ -50,7 +50,7 @@ describe('desktop edition manifest', () => {
     expect(config.extraMetadata.dshDesktopAppId).toBe(desktopEdition.bundleId)
     expect(config.productName).toBe(desktopEdition.productName)
     expect(config.electronLanguages).toEqual(['en-US', 'zh-CN'])
-    expect(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))).toHaveProperty('version', '0.2.1-alpha.1')
+    expect(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))).toHaveProperty('version', '0.1.1')
     expect(config.mac.electronLanguages).toEqual(['en', 'zh_CN'])
     expect(config.mac.target).toEqual(['dmg'])
     expect(config.artifactName).toContain(desktopEdition.artifactStem)

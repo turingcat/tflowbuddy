@@ -225,7 +225,7 @@ describe('parseVendoredRows', () => {
 
   it('keeps the GPL exception out of installed runtime license authorization', () => {
     for (const name of ['unrelated-library', 'dsh-pocket', 'dsh-pocket-extra']) {
-      expect(() => assertRuntimeLicenses([{ name, license: 'GPL-2.0' }])).toThrow(`${name} (GPL-2.0)`)
+      expect(() => { assertRuntimeLicenses([{ name, license: 'GPL-2.0' }]) }).toThrow(`${name} (GPL-2.0)`)
     }
     expect(isPermissive('GPL-2.0')).toBe(false)
     expect(isOwnerAuthorizedRuntime('dsh-pocket')).toBe(false)

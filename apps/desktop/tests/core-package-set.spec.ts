@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -100,4 +100,18 @@ describe('desktop core package set', () => {
       )
     }).toThrow(/outside the local package set/u)
   })
+})
+
+
+it('pins an image runtime that supports Node 24 on Windows ia32', async () => {
+  const { createRuntimeProjectMetadata } = await import('../src/project-manager.ts')
+  const { DESKTOP_HOST_PROTOCOL_VERSION } = await import('../src/host-protocol.ts')
+  const { root } = packageSetProject()
+  createRuntimeProjectMetadata(root, {
+    schemaVersion: 1, version: '1.2.3', hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
+    nodeVersion: '24.11.1', pnpmVersion: '11.7.0',
+  }, { platform: 'win32', arch: 'ia32' })
+  const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
+  expect(workspace).toContain('"sharp": "0.34.5"')
+  expect(workspace.split('allowBuilds:\n')[1]).toContain('  sharp: true\n')
 })

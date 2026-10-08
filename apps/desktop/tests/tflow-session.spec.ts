@@ -161,7 +161,7 @@ describe('createTFlowSession', () => {
       idempotencyKey: () => 'idem',
     })
     await session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
-    await expect(session.selectGroup('7')).resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/未返回可用模型/u) })
+    await expect(session.selectGroup('7')).resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/未返回可用模型/u) as string })
     expect(record.saved).toEqual([])
   })
 
@@ -176,7 +176,7 @@ describe('createTFlowSession', () => {
       ]),
     })
     await expect(session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' }))
-      .resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/没有可用的模型分组/u) })
+      .resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/没有可用的模型分组/u) as string })
   })
 
   it('asks for the second factor and then offers the groups', async () => {
@@ -238,7 +238,7 @@ describe('createTFlowSession', () => {
       ]),
     })
     await session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' })
-    await expect(session.complete('123456')).resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/没有可用的模型分组/u) })
+    await expect(session.complete('123456')).resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/没有可用的模型分组/u) as string })
   })
 
   it('refuses a group selection when no sign-in is outstanding', async () => {
@@ -307,17 +307,17 @@ describe('createTFlowSession', () => {
       fetch: () => Promise.reject(new Error('boom')),
     })
     await expect(session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' }))
-      .resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/无法连接/u) })
+      .resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/无法连接/u) as string })
   })
 
   it('names a failure that is not an Error', async () => {
     const session = createTFlowSession({
       panelUrl: PANEL,
       effects: effects(),
-      fetch: () => Promise.reject('nope'),
+      fetch: async () => { throw 'nope' },
     })
     await expect(session.start({ email: 'a@b.c', password: 'p', captchaProof: 'c' }))
-      .resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/无法连接/u) })
+      .resolves.toMatchObject({ kind: 'failed', message: expect.stringMatching(/无法连接/u) as string })
   })
 })
 

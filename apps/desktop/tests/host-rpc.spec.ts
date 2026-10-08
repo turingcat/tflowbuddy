@@ -161,7 +161,7 @@ describe('readLocalePreference', () => {
 
 describe('connectHostRpc', () => {
   /** An authenticated Host stub that echoes the request id, as the real Host does. */
-  function transport(craft: (rpcId: string) => unknown, status = 200): (input: string, init?: RequestInit) => Promise<Response> {
+  function transport(craft: (rpcId: string) => unknown, status = 200) {
     return vi.fn((input: string, init?: RequestInit) => {
       if (!input.includes('/api/')) return Promise.resolve(new Response('index', { status: 200 }))
       const body = JSON.parse(requestBody(init)) as { rpcId: string }
@@ -188,7 +188,7 @@ describe('connectHostRpc', () => {
     const call = await connectHostRpc('http://127.0.0.1:3080/?token=t', send)
     await expect(call({ namespace: 'llm', method: 'listModels', args: { provider: 'tflow' } })).resolves.toBe('value')
 
-    const request = (send as unknown as { mock: { calls: Array<[string, RequestInit]> } }).mock.calls.at(-1)!
+    const request = send.mock.calls.at(-1)!
     expect(request[0]).toBe('http://127.0.0.1:3080/api/llm/listModels')
     expect(request[1]).toMatchObject({ method: 'POST', credentials: 'include', redirect: 'error' })
     expect(JSON.parse(requestBody(request[1]))).toMatchObject({

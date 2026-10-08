@@ -1,7 +1,8 @@
 /** Process reservations retain native cleanup ownership across stream and allocation failures. */
 import { once } from 'node:events'
-import { chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { chmod, mkdtemp, readdir, rm } from 'node:fs/promises'
 import { createConnection, type Socket } from 'node:net'
+import { Server } from 'node:tls'
 import { PassThrough } from 'node:stream'
 import { Context } from '@deepseek-ai/cordis'
 import type { SubprocessHandle, SubprocessOutcome, SubprocessTerminalHandle } from '@deepseek-ai/dsh-subprocess'
@@ -198,14 +199,37 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
     } finally { await test.close() }
   })
 
-  it('rolls back a listener path that exceeds the operating system socket limit', async () => {
-    const root = await mkdtemp('/tmp/dsh-ssh-long-')
-    const longRoot = `${root}/${'x'.repeat(140)}`
-    await mkdir(longRoot)
-    const owner = new RemoteProcesses(new Context(), longRoot, 1, 5000)
+  it('rolls back a listener allocation when the operating system refuses the socket', async () => {
+    const root = await mkdtemp('/tmp/dsh-ssh-listen-')
+    const owner = new RemoteProcesses(new Context(), root, 1, 5000)
+    const listen = vi.spyOn(Server.prototype, 'listen').mockImplementationOnce(() => {
+      throw Object.assign(new Error('socket path refused'), { code: 'ENAMETOOLONG' })
+    })
     try {
-      await expect(owner.prepare(ordinaryRequest)).rejects.toThrow()
-    } finally { await owner.close(); await rm(root, { recursive: true, force: true }) }
+      await expect(owner.prepare(ordinaryRequest)).rejects.toThrow('socket path refused')
+      expect(await readdir(root)).toEqual([])
+    } finally {
+      listen.mockRestore()
+      await owner.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rolls back a listener allocation when the server emits an allocation error', async () => {
+    const root = await mkdtemp('/tmp/dsh-ssh-listen-event-')
+    const owner = new RemoteProcesses(new Context(), root, 1, 5000)
+    const listen = vi.spyOn(Server.prototype, 'listen').mockImplementationOnce(function (this: Server) {
+      this.emit('error', Object.assign(new Error('socket path in use'), { code: 'EADDRINUSE' }))
+      return this
+    })
+    try {
+      await expect(owner.prepare(ordinaryRequest)).rejects.toThrow('socket path in use')
+      expect(await readdir(root)).toEqual([])
+    } finally {
+      listen.mockRestore()
+      await owner.close()
+      await rm(root, { recursive: true, force: true })
+    }
   })
 
   it('continues collecting while a live snapshot waits for acknowledgement', async () => {

@@ -95,7 +95,7 @@ it('keeps mandatory diagnostics expandable without clearing the block or authori
   expect([p.element('error').textContent, p.element('technical-details-label').textContent,
     p.element('update').textContent]).toMatchInlineSnapshot(`
       [
-        "未能安全停止任务，更新尚未安装，请稍后重试。",
+        "未能安全停止任务，更新未安装。请稍后重试。",
         "查看技术详情",
         "重试更新",
       ]
@@ -182,7 +182,7 @@ it('uses the same modal for download, verification, inspected confirmation and t
   p.publish({ ...p.initial, update: { phase: 'installing' }, restart: 'preparing' })
   expect(p.element('detail').textContent).toBe('应用即将重启，请稍候。')
   p.publish({ ...p.initial, update: { phase: 'installing' }, restart: 'stopping-tasks' })
-  expect(p.element('detail').textContent).toBe('正在停止任务…')
+  expect(p.element('detail').textContent).toBe('正在安全结束应用中的任务。')
   expect(p.document.querySelector('main')).toBe(modal)
 })
 
@@ -191,7 +191,7 @@ it('reveals the complete selectable address only after copy failure, without rep
   await expect.poll(() => p.element('error').textContent).toBe('更新文件下载或准备失败，请重试。')
   const originalError = p.element('error').textContent
   p.publish({ ...p.initial, navigation: { page: 'requested' } })
-  expect(p.element('browser-message').textContent).toBe('页面未打开？')
+  expect(p.element('browser-message').textContent).toBe('若页面未打开，可')
   expect(p.element('manual-copy').hidden).toBe(true)
   p.publish({ ...p.initial, navigation: { page: 'failed', copy: 'failed' } })
   expect(p.element('manual-copy').hidden).toBe(false)
@@ -199,11 +199,11 @@ it('reveals the complete selectable address only after copy failure, without rep
   expect((p.element('address') as HTMLTextAreaElement).readOnly).toBe(true)
   expect(p.element('error').textContent).toBe(originalError)
   expect(p.element('technical-details-content').textContent).toBe('HASH_MISMATCH')
-  expect(p.element('copy-message').textContent).toBe('复制失败，请手动选择并复制下方链接。')
+  expect(p.element('copy-message').textContent).toBe('复制失败，请手动选择下方地址复制。')
   p.publish({ ...p.initial, navigation: { page: 'failed', copy: 'copied' } })
   expect(p.element('manual-copy').hidden).toBe(true)
   expect((p.element('address') as HTMLTextAreaElement).value).toBe('')
-  expect(p.element('copy').textContent).toBe('链接已复制')
+  expect(p.element('copy').textContent).toBe('已复制链接')
   expect(p.action).not.toHaveBeenCalled()
 })
 

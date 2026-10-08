@@ -26,7 +26,6 @@ vi.mock('../scripts/windows-runtime-signature.mjs', async importOriginal => ({
 }))
 // Vite's root-relative IDs also resolve mocked build outputs on a clean checkout.
 vi.mock('/apps/desktop/lib/types/runtime-tree.js', () => ({ verifyDesktopRuntime: async () => {} }))
-vi.mock('/apps/desktop/lib/types/mandatory-update-policy.js', async () => import('../src/mandatory-update-policy.ts'))
 vi.mock('node:crypto', async importOriginal => ({
   ...await importOriginal<typeof import('node:crypto')>(),
   X509Certificate: class { fingerprint = 'AA:BB' },
@@ -245,9 +244,8 @@ it.each([false, true])('keeps the complete Office engine outside ASAR with exter
   await packageFixture(input)
   const archive = await readAsar(join(input.resources, 'app.asar'))
   expect(archive.getFile(join('dsh', 'node_modules', '@deepseek-ai', 'libreoffice-kit-wasm', 'package.json')).unpacked).not.toBe(true)
-  for (const name of ['@deepseek-ai/libreoffice-kit', 'office-codec']) {
-    expect(archive.getFile(join('dsh', 'node_modules', name, 'cli.js')).unpacked).toBe(true)
-  }
+  expect(archive.getFile(join('dsh', 'node_modules', '@deepseek-ai/libreoffice-kit', 'cli.js')).unpacked).toBe(true)
+  expect(archive.getFile(join('dsh', 'node_modules', 'office-codec', 'cli.js')).unpacked).not.toBe(true)
   for (const file of files) {
     expect(archive.getFile(join('dsh', engine, file), false).unpacked).toBe(true)
     expect(await readFile(join(input.resources, 'app.asar.unpacked', 'dsh', engine, file), 'utf8')).toBe('{}')

@@ -606,8 +606,8 @@ function electronInstallGate(): Gate {
   return {
     id: 'electron-install',
     label: 'Electron binary',
-    displayCommand: 'pnpm --filter @deepseek-ai/dsh-desktop exec install-electron',
-    ...pnpmInvocation(['--filter', '@deepseek-ai/dsh-desktop', 'exec', 'install-electron']),
+    displayCommand: 'pnpm --filter @deepseek-ai/dsh-desktop exec node node_modules/electron/install.js',
+    ...pnpmInvocation(['--filter', '@deepseek-ai/dsh-desktop', 'exec', 'node', 'node_modules/electron/install.js']),
     env: { ELECTRON_GET_USE_PROXY: '1' },
   }
 }

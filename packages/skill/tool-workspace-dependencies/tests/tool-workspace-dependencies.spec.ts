@@ -266,6 +266,13 @@ it('returns the carrier Node.js and pnpm beside a Python-only payload, so the ag
   expect(result.content).toEqual([{ type: 'text', text: JSON.stringify({ ...workspaceDependencyPaths(source, manifest), node, pnpm }, undefined, 2) }])
 })
 
+it('returns a carrier Node.js without inventing a pnpm entry', async () => {
+  const { source, directory, manifest, node } = await pythonOnlyWithCarrier()
+  const result = await executeConfigured(directory, { source, node })
+  expect(result.isError).toBe(false)
+  expect(result.content).toEqual([{ type: 'text', text: JSON.stringify({ ...workspaceDependencyPaths(source, manifest), node }, undefined, 2) }])
+})
+
 it('refuses a carrier Node.js when the payload ships its own, rather than choosing one silently', async () => {
   const { source, directory } = await fixture()
   const node = join(directory, 'launcher', 'node')

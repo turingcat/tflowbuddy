@@ -193,9 +193,9 @@ export function createTFlowLoginBackend(options: TFlowLoginBackendOptions): TFlo
 
     async start(input) {
       return await continueWithRememberedGroup(loginView(await session.start({
-        email: textField(input?.email, '邮箱'),
-        password: textField(input?.password, '密码'),
-        captchaProof: captchaProof(input?.captchaProof),
+        email: textField(input.email, '邮箱'),
+        password: textField(input.password, '密码'),
+        captchaProof: captchaProof(input.captchaProof),
       })))
     },
 

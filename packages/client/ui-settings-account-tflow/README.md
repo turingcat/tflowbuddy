@@ -26,6 +26,8 @@ The package activates only inside a renderer the Electron shell loaded, identifi
 <a id="use-this-package"></a>
 ## Use this package
 
+Account cards and actions use the shared radius scale; keyboard focus rings respect the shared input-modality color.
+
 The username menu offers Settings, account management, and sign-out. Usage is available inside Settings only.
 
 Mount this plugin in a browser roster that the desktop application loads. It contributes an account page (`tflow-account`) and a usage page (`tflow-usage`) through `settings.section`, and a sidebar launcher through `settings.launcher` that shows the signed-in username and starts the account read when it mounts.

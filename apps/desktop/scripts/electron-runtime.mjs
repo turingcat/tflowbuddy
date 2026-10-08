@@ -61,3 +61,19 @@ export function resolveElectronRuntimeSource(platform, arch) {
   }
   throw new Error(`unsupported electron runtime target: ${platform}/${arch}`)
 }
+
+/**
+ * Select Electron headers and import libraries for native package build scripts.
+ * @param {string} platform Target platform.
+ * @param {string} arch Target architecture.
+ * @returns {Record<string, string>} node-gyp environment for the pinned runtime.
+ */
+export function electronNativeBuildEnvironment(platform, arch) {
+  const source = resolveElectronRuntimeSource(platform, arch)
+  return {
+    npm_config_runtime: 'electron',
+    npm_config_target: source.version,
+    npm_config_disturl: 'https://www.electronjs.org/headers',
+    npm_config_arch: arch,
+  }
+}

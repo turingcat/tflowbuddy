@@ -16,10 +16,10 @@ const workflow = yaml.load(readFileSync(resolve(import.meta.dirname, '../.github
 const preview = workflow.jobs.preview
 
 describe('PR preview workflow', () => {
-  it('keeps every PR author on the selected GitHub-hosted runner', () => {
+  it('keeps upstream preview manual-only on a GitHub-hosted runner', () => {
     expect(Object.keys(workflow.jobs)).toEqual(['preview'])
     expect(preview['runs-on']).toBe('ubuntu-24.04')
-    expect(workflow.on).toEqual({ pull_request: { types: ['opened', 'synchronize', 'reopened'] } })
+    expect(workflow.on).toEqual({ workflow_dispatch: null })
     expect(workflow.permissions).toEqual({ contents: 'read', 'pull-requests': 'write' })
     expect(preview.steps.find(step => step.uses === 'actions/checkout@v6')?.with).toEqual({ 'persist-credentials': false })
   })

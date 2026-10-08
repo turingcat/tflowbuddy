@@ -27,6 +27,8 @@ This package gives an `official` client build the TFlow badge and name in the si
 
 Mount this plugin in the browser roster of a deployment whose identity is TFlowBuddy's, then build the client with the `official` profile so the occupants register.
 
+The browser plugin requires the locale service and registers `brand.tflow` dictionaries for the wordmark text and accessible label; both English and Chinese retain the registered product name.
+
 ### Choosing the profile
 
 `DSH_CLIENT_BUILD_PROFILE` selects which brand renders. An `official` build shows the official mark and name in the sidebar; any other value leaves the shell fallbacks — the TFlow badge and the local-build label — in place. The conversation hero shows the animated hero fish from `dsh-client-ui-conversation` regardless of profile, because that fallback is already the official mark. The plugin still loads and validates in both cases; only the registration is profile-gated.

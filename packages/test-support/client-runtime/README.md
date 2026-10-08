@@ -27,6 +27,8 @@ Linked bundles resolve dependencies from their real package directories; depende
 <a id="use-this-package"></a>
 ## Use this package
 
+Vendored Pocket tests load the ESM client source through Vitest aliases, not its browser-loader bundle. The shared jsdom shims include a non-matching `matchMedia` and preserve any existing implementation.
+
 This package gives a browser feature spec a real runtime to mount against: create the bench, declare the slots your feature occupies, mount the feature plugin, render a slot, assert on the local view, and dispose — with no second implementation of production logic.
 
 ### Setting up a feature spec

@@ -164,15 +164,18 @@ const processBoundTests = [
   'packages/workflow/workflow-ptc/tests/workflow-ptc.spec.ts',
 ]
 
-// Claude Code's test-kit module names, served by the mods bridge's test support so the example mods' tests import them unchanged.
-const claudeCodeTestingAliases = {
+// Test-only source aliases for browser plugins and the Claude Code mods bridge.
+const testingAliases = {
+  // The vendored /client export is a browser-loader bundle; tests load its ESM source.
+  'dsh-pocket/client': fileURLToPath(new URL('./vendor/dsh-pocket/client/index.jsx', import.meta.url)),
+  'react': fileURLToPath(new URL('./packages/client/ui-primitives/node_modules/react', import.meta.url)),
   'claude-code/testing': fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code-testing.ts', import.meta.url)),
   'claude-code': fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code.ts', import.meta.url)),
 }
 
 export default defineConfig({
   plugins: [pathsPlugin(), standardDecoratorPlugin()],
-  resolve: { alias: claudeCodeTestingAliases },
+  resolve: { alias: testingAliases },
   test: {
     setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
     // .tsx: client component specs (jsdom via per-file @vitest-environment pragma).
@@ -183,7 +186,7 @@ export default defineConfig({
     projects: [
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: claudeCodeTestingAliases },
+        resolve: { alias: testingAliases },
         test: {
           name: 'thread-safe',
           execArgv: vitestExecArgv,
@@ -203,7 +206,7 @@ export default defineConfig({
       },
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: claudeCodeTestingAliases },
+        resolve: { alias: testingAliases },
         test: {
           name: 'process-bound',
           execArgv: vitestExecArgv,

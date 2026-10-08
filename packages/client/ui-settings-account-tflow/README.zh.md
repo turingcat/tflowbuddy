@@ -26,6 +26,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+账号卡片与操作控件使用共享圆角尺度；键盘焦点环采用共享输入方式颜色。
+
 用户名菜单提供设置、账号管理和退出登录。用量仅在设置面板内提供。
 
 在桌面应用加载的浏览器 roster 中挂载本插件。它通过 `settings.section` 提供账号页面（`tflow-account`）与用量页面（`tflow-usage`），并通过 `settings.launcher` 提供侧栏启动器；启动器显示已登录用户名，并在挂载时发起账号读取。

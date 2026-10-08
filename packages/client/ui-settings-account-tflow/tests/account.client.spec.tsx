@@ -30,12 +30,19 @@ function mountSection(snapshot: TFlowAccountSnapshot, copy: typeof en | typeof z
   // The section consumes no slot-derived share beyond the inject face, so the
   // stub supplies the three seats it reads and no framework seats.
   const props = {
+    usePanelInfo: () => { throw new Error('unexpected panel hook') },
+    useSessions: () => { throw new Error('unexpected sessions hook') },
+    useSessionStatus: () => { throw new Error('unexpected status hook') },
+    useSessionRetainInfo: () => { throw new Error('unexpected retain hook') },
+    useWorkspaces: () => { throw new Error('unexpected workspace hook') },
+    useResource: () => { throw new Error('unexpected resource hook') },
     close: () => {},
     refresh: operations.refresh,
     manage: operations.manage,
-    useAccount: (selector: (value: TFlowAccountSnapshot) => unknown) => selector(observable.getSnapshot()),
+    signOut: operations.signOut,
+    useAccount: <T,>(selector: (value: TFlowAccountSnapshot) => T): T => selector(observable.getSnapshot()),
     t: copySeat(copy),
-  } as unknown as Parameters<typeof TFlowAccountSection>[0]
+  } as Parameters<typeof TFlowAccountSection>[0]
   render(<TFlowAccountSection {...props} />)
   return operations
 }
@@ -121,10 +128,16 @@ it('offers settings and the account site from the launcher, and shows the accoun
   }
   const observable = source({ status: 'ready', account: { displayName: 'alice', balance: 1 } })
   const props = {
+    usePanelInfo: () => { throw new Error('unexpected panel hook') },
+    useSessions: () => { throw new Error('unexpected sessions hook') },
+    useSessionStatus: () => { throw new Error('unexpected status hook') },
+    useSessionRetainInfo: () => { throw new Error('unexpected retain hook') },
+    useWorkspaces: () => { throw new Error('unexpected workspace hook') },
+    useResource: () => { throw new Error('unexpected resource hook') },
     refresh: operations.refresh, manage: operations.manage, signOut: operations.signOut,
-    useAccount: (selector: (value: TFlowAccountSnapshot) => unknown) => selector(observable.getSnapshot()),
-    wide: true, openSettings, openOnboarding: () => {}, t: copySeat(zh),
-  } as unknown as Parameters<typeof TFlowAccountMenu>[0]
+    useAccount: <T,>(selector: (value: TFlowAccountSnapshot) => T): T => selector(observable.getSnapshot()),
+    wide: true, settingsOpen: false, openSettings, openOnboarding: () => {}, t: copySeat(zh),
+  } as Parameters<typeof TFlowAccountMenu>[0]
   render(<TFlowAccountMenu {...props} />)
   // The sidebar is the first account surface on screen; without this read the name never replaces the fallback.
   expect(operations.refresh).toHaveBeenCalledOnce()
@@ -150,10 +163,16 @@ it('opens the account site from the launcher and hides the name in the collapsed
   }
   const observable = source({ status: 'signed-out' })
   const props = {
+    usePanelInfo: () => { throw new Error('unexpected panel hook') },
+    useSessions: () => { throw new Error('unexpected sessions hook') },
+    useSessionStatus: () => { throw new Error('unexpected status hook') },
+    useSessionRetainInfo: () => { throw new Error('unexpected retain hook') },
+    useWorkspaces: () => { throw new Error('unexpected workspace hook') },
+    useResource: () => { throw new Error('unexpected resource hook') },
     refresh: operations.refresh, manage: operations.manage,
-    useAccount: (selector: (value: TFlowAccountSnapshot) => unknown) => selector(observable.getSnapshot()),
-    wide: false, openSettings: vi.fn(), openOnboarding: () => {}, t: copySeat(en),
-  } as unknown as Parameters<typeof TFlowAccountMenu>[0]
+    useAccount: <T,>(selector: (value: TFlowAccountSnapshot) => T): T => selector(observable.getSnapshot()),
+    wide: false, settingsOpen: false, signOut: operations.signOut, openSettings: vi.fn(), openOnboarding: () => {}, t: copySeat(en),
+  } as Parameters<typeof TFlowAccountMenu>[0]
   render(<TFlowAccountMenu {...props} />)
   expect(screen.getByRole('button', { name: en.nav }).textContent).toBe('')
   fireEvent.click(screen.getByRole('button', { name: en.nav }))
@@ -169,11 +188,17 @@ it('ships the same key set in both languages', () => {
 function mountUsage(snapshot: TFlowUsageSnapshot, refresh = vi.fn(() => Promise.resolve())) {
   // Same seat subset as `mountSection`: the section reads no framework seats.
   const props = {
+    usePanelInfo: () => { throw new Error('unexpected panel hook') },
+    useSessions: () => { throw new Error('unexpected sessions hook') },
+    useSessionStatus: () => { throw new Error('unexpected status hook') },
+    useSessionRetainInfo: () => { throw new Error('unexpected retain hook') },
+    useWorkspaces: () => { throw new Error('unexpected workspace hook') },
+    useResource: () => { throw new Error('unexpected resource hook') },
     close: () => {},
     refresh,
-    useUsage: (selector: (value: TFlowUsageSnapshot) => unknown) => selector(snapshot),
+    useUsage: <T,>(selector: (value: TFlowUsageSnapshot) => T): T => selector(snapshot),
     t: copySeat(zh),
-  } as unknown as Parameters<typeof TFlowUsageSection>[0]
+  } as Parameters<typeof TFlowUsageSection>[0]
   render(<TFlowUsageSection {...props} />)
   return refresh
 }
@@ -203,4 +228,35 @@ it('offers a retry after a failed usage read', async () => {
   expect(screen.getByText(zh.usageFailed)).toBeTruthy()
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: zh.retry })); await Promise.resolve() })
   expect(refresh).toHaveBeenCalledTimes(2)
+})
+
+it('shows usage loading before the first read settles', () => {
+  mountUsage({ status: 'loading' })
+  expect(screen.getByText(zh.loading)).toBeTruthy()
+})
+
+it('does not update retry state after the section unmounts', async () => {
+  const pending = Promise.withResolvers<undefined>()
+  mountSection({ status: 'failed' }, en, vi.fn(() => pending.promise))
+  cleanup()
+  await act(async () => { pending.resolve(undefined); await pending.promise })
+})
+
+it('closes the launcher on Escape and uses the navigation label without an account', async () => {
+  const props = {
+    usePanelInfo: () => { throw new Error('unexpected panel hook') },
+    useSessions: () => { throw new Error('unexpected sessions hook') },
+    useSessionStatus: () => { throw new Error('unexpected status hook') },
+    useSessionRetainInfo: () => { throw new Error('unexpected retain hook') },
+    useWorkspaces: () => { throw new Error('unexpected workspace hook') },
+    useResource: () => { throw new Error('unexpected resource hook') },
+    wide: true, settingsOpen: false, openSettings: vi.fn(), openOnboarding: vi.fn(),
+    useAccount: <T,>(selector: (value: TFlowAccountSnapshot) => T): T => selector({ status: 'signed-out' }),
+    refresh: vi.fn(() => Promise.resolve()), manage: vi.fn(), signOut: vi.fn(), t: copySeat(en),
+  } as Parameters<typeof TFlowAccountMenu>[0]
+  render(<TFlowAccountMenu {...props} />)
+  expect(screen.getByRole('button', { name: en.nav }).textContent).toBe(en.nav)
+  fireEvent.click(screen.getByRole('button', { name: en.nav }))
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+  expect(screen.queryByRole('menu')).toBeNull()
 })

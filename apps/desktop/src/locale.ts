@@ -78,7 +78,7 @@ export const en = {
   cancel: 'Cancel',
   quitTitle: `Quit ${productName}?`,
   quitActiveTasks: 'Running tasks will be interrupted.',
-  quitScheduledTasks: 'Scheduled tasks not run while app closed.',
+  quitScheduledTasks: 'Scheduled tasks will not run while the app is closed.',
   quitActiveAndScheduledTasks: 'Running tasks will be interrupted, scheduled tasks not run while app is closed.',
   backgroundNoticeBody: 'Running tasks will continue. You can reopen the window from the system tray.',
   backgroundNoticeConfirm: 'Confirm',

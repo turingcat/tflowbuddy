@@ -40,7 +40,6 @@ function fixture(runtimeName = 'dsh') {
 
 it('resolves engine manifests to physical directories and leaves unrelated modules alone', () => {
   const f = fixture()
-  // Node 24.13 require.resolve bypasses hooks; Electron's require.resolve is covered by packaged Office smoke.
   expect(f.require('@deepseek-ai/libreoffice-kit-darwin-arm64/package.json'))
     .toMatchObject({ path: realpathSync(dirname(join(f.root, 'app.asar.unpacked', 'dsh', f.manifest))) })
   expect((f.require('node:fs') as typeof import('node:fs')).realpathSync).toBe(realpathSync)
@@ -51,6 +50,21 @@ it('resolves an absolute engine manifest to its unpacked copy', () => {
   const f = fixture()
   expect(f.require(join(f.runtime, f.manifest)))
     .toMatchObject({ path: realpathSync(dirname(join(f.root, 'app.asar.unpacked', 'dsh', f.manifest))) })
+})
+
+it('resolves native helper discovery through require.resolve to the physical engine', () => {
+  const f = fixture()
+  const require = createRequire(join(f.runtime, 'package.json'))
+  expect(require.resolve('@deepseek-ai/libreoffice-kit-darwin-arm64/package.json'))
+    .toBe(realpathSync(join(f.root, 'app.asar.unpacked', 'dsh', f.manifest)))
+})
+
+it('restores native manifest resolution after disposal', () => {
+  const f = fixture()
+  hooks.pop()!.deregister()
+  const require = createRequire(join(f.runtime, 'package.json'))
+  expect(require.resolve('@deepseek-ai/libreoffice-kit-darwin-arm64/package.json'))
+    .toBe(realpathSync(join(f.runtime, f.manifest)))
 })
 
 it.each(['exports', 'main'] as const)('refreshes a cached plugin %s while Office resolution stays active', (field) => {

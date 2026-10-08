@@ -103,7 +103,7 @@ it('offers copy immediately while browser opening is pending and keeps navigatio
   const f = setup()
   const opened = Promise.withResolvers<undefined>()
   native.open.mockReturnValueOnce(opened.promise)
-  native.read.mockResolvedValue('https://downloads.example.com/desktop')
+  native.read.mockReturnValue('https://downloads.example.com/desktop')
   const pending = f.action('page')
   expect(f.view().navigation).toEqual({ page: 'requested' })
   await f.action('copy')
@@ -117,7 +117,7 @@ it('offers copy immediately while browser opening is pending and keeps navigatio
 
 it('reports clipboard failure and ignores completion after the policy destination changes', async () => {
   const f = setup()
-  native.read.mockResolvedValue('different clipboard contents')
+  native.read.mockReturnValue('different clipboard contents')
   await f.action('page')
   await f.action('copy')
   expect(f.view().navigation?.copy).toBe('failed')
@@ -210,5 +210,5 @@ it.each(['darwin', 'win32'] as const)('includes the installation wait notice onl
   const f = setup(platform)
   expect(f.view().locale.messages.mandatoryReadyDetail).toBe(platform === 'win32'
     ? '更新期间应用将暂时关闭，完成后会自动打开。\n\n更新可能需要一些时间，请耐心等待，期间请勿重复启动应用。'
-    : '更新期间应用将暂时关闭，完成后会自动打开。')
+    : '安装后将重新启动应用。')
 })

@@ -7,7 +7,7 @@
  *
  * @module
  */
-import { useEffect, useRef, useState } from 'react'
+import { useRefresh } from './use-refresh.ts'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './AccountSection.module.css'
 
@@ -54,24 +54,7 @@ const PERIODS = ['today', 'total'] as const
  */
 export function TFlowUsageSection({ t, useUsage, refresh }: TFlowUsageSectionProps) {
   const snapshot = useUsage(value => value)
-  const [busy, setBusy] = useState(false)
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => { mounted.current = false }
-  }, [])
-  useEffect(() => { void runRefresh() }, [refresh])
-
-  /** One refresh with a busy state the retry button reflects. */
-  async function runRefresh(): Promise<void> {
-    setBusy(true)
-    try { await refresh() }
-    catch {
-      // The hook carries the failure state; a rejected refresh is already reported there.
-    } finally {
-      if (mounted.current) setBusy(false)
-    }
-  }
+  const { busy, runRefresh } = useRefresh(refresh)
 
   if (snapshot.status === 'signed-out') {
     return <section className={css.section} aria-label={t('usage')}>

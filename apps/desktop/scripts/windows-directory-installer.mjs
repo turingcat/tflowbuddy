@@ -13,6 +13,15 @@ function replaceOnce(source, before, after) {
 }
 
 /**
+ * Select the installer UI resources beside one target's artifact directory.
+ * @param {string} outputDirectory - Signed or unsigned target artifact directory.
+ * @returns {string} NSIS definition overriding the template's development default.
+ */
+export function directoryInstallerHeader(outputDirectory) {
+  return `!define INSTALLER_BUILD_DIR "${join(dirname(outputDirectory), 'installer-ui')}"\n`
+}
+
+/**
  * Preserve upstream registration and uninstall UI while replacing payload installation.
  * @param {string} source - Pinned electron-builder installSection.nsh contents.
  * @returns {string} Section with staging before shutdown and directory promotion before registration.
@@ -80,7 +89,7 @@ export function installWindowsDirectoryInstaller() {
     const uninstaller = join(directory, 'uninstaller.nsh')
     await writeFile(uninstaller, directoryUninstaller(await readFile(join(templates, 'uninstaller.nsh'), 'utf8')))
     adapted = replaceOnce(adapted, '!include "uninstaller.nsh"', `!include "${uninstaller}"`)
-    return `!define DSH_UPDATER_CACHE_NAME "${this.packager.appInfo.updaterCacheDirName}"\n!define DSH_SEVENZIP_PATH "${tool}"\n!define DSH_SEVENZIP_LICENSE_DIR "${dirname(dirname(sourceTool))}"\n${await compute.call(this, adapted, ...args)}`
+    return `${directoryInstallerHeader(this.outDir)}!define DSH_UPDATER_CACHE_NAME "${this.packager.appInfo.updaterCacheDirName}"\n!define DSH_SEVENZIP_PATH "${tool}"\n!define DSH_SEVENZIP_LICENSE_DIR "${dirname(dirname(sourceTool))}"\n${await compute.call(this, adapted, ...args)}`
   }
 }
 

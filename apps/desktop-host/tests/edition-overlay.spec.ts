@@ -13,6 +13,7 @@ it('disables the DeepSeek account launcher, account service, and model adapter',
     { id: 'ui-settings-account', disabled: true },
     { id: 'deepseek-account', disabled: true },
     { id: 'llm-deepseek', disabled: true },
+    { id: 'office-to-pdf', disabled: { __jsExpr: "process.platform === 'win32' && process.arch === 'ia32'" } },
   ])
 })
 

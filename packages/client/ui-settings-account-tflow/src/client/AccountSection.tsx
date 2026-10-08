@@ -9,7 +9,7 @@
  *
  * @module
  */
-import { useEffect, useRef, useState } from 'react'
+import { useRefresh } from './use-refresh.ts'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './AccountSection.module.css'
 
@@ -60,12 +60,12 @@ export type TFlowAccountSectionProps =
 const WINDOWS = ['daily', 'weekly', 'monthly'] as const
 
 /**
- * Render one amount the panel reported, or the placeholder when it reported none.
- * @param value - amount in USD, or `undefined` when the panel omitted it.
+ * Render one amount the panel reported.
+ * @param value - amount in USD.
  * @returns the formatted amount.
  */
-function amount(value: number | undefined): string {
-  return value === undefined ? '—' : `$${value.toFixed(2)}`
+function amount(value: number): string {
+  return `$${value.toFixed(2)}`
 }
 
 /**
@@ -75,24 +75,7 @@ function amount(value: number | undefined): string {
  */
 export function TFlowAccountSection({ t, useAccount, refresh, manage }: TFlowAccountSectionProps) {
   const snapshot = useAccount(value => value)
-  const [busy, setBusy] = useState(false)
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => { mounted.current = false }
-  }, [])
-  useEffect(() => { void runRefresh() }, [refresh])
-
-  /** One refresh with a busy state the retry button reflects. */
-  async function runRefresh(): Promise<void> {
-    setBusy(true)
-    try { await refresh() }
-    catch {
-      // The hook carries the failure state; a rejected refresh is already reported there.
-    } finally {
-      if (mounted.current) setBusy(false)
-    }
-  }
+  const { busy, runRefresh } = useRefresh(refresh)
 
   if (snapshot.status === 'signed-out') {
     return <section className={css.section} aria-label={t('nav')}>
@@ -115,7 +98,10 @@ export function TFlowAccountSection({ t, useAccount, refresh, manage }: TFlowAcc
   const subscription = account.subscription
   const reported = subscription === undefined
     ? []
-    : WINDOWS.filter(window => subscription.remaining[window] !== undefined)
+    : WINDOWS.flatMap((window) => {
+      const value = subscription.remaining[window]
+      return value === undefined ? [] : [{ window, value }]
+    })
   return <section className={css.section} aria-label={t('nav')}>
     <div className={css.card}>
       <div className={css.identityCopy}>
@@ -139,7 +125,7 @@ export function TFlowAccountSection({ t, useAccount, refresh, manage }: TFlowAcc
         <div className={css.row}>
           <span>{t('remaining')}</span>
           <span className={css.amount}>
-            {reported.map(window => <span key={window}>{`${t(window)} ${amount(subscription?.remaining[window])}`}</span>)}
+            {reported.map(({ window, value }) => <span key={window}>{`${t(window)} ${amount(value)}`}</span>)}
           </span>
         </div>
       </>}

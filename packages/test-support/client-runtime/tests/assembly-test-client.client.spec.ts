@@ -19,7 +19,7 @@ const PARALLEL_PROBE = '@deepseek-ai/dsh-client-test-parallel-probe'
 /** Declared by ui-sidebar, whose SlotMap merge is outside this package's compilation face. */
 const SIDEBAR_SETTINGS = 'sidebar.settings' as never
 const BRAND = '@deepseek-ai/dsh-client-ui-brand-official'
-const globals = globalThis as { EventSource?: unknown; ResizeObserver?: unknown }
+const globals = globalThis as { EventSource?: unknown; ResizeObserver?: unknown; matchMedia?: unknown }
 /** The whole roster's first boot pays the cold module transform of every plugin package. */
 const COLD_BOOT_TIMEOUT_MS = 60_000
 
@@ -45,17 +45,29 @@ describe('TestClient (jsdom)', () => {
     expect('__DSH_TRANSPORT__' in globalThis).toBe(false)
     expect(globals.EventSource).toBeDefined()
     expect(globals.ResizeObserver).toBeDefined()
+    expect(window.matchMedia('(max-width: 1023px)').matches).toBe(false)
+    const media = window.matchMedia('(max-width: 1023px)')
+    const listener = vi.fn()
+    // oxlint-disable-next-line typescript/no-deprecated -- Exercise the shim's legacy browser API.
+    media.addListener(listener)
+    expect(media.dispatchEvent(new Event('change'))).toBe(true)
+    expect(listener).not.toHaveBeenCalled()
+    // oxlint-disable-next-line typescript/no-deprecated -- Exercise the shim's legacy browser API.
+    media.removeListener(listener)
     expect(document.fonts).toBeInstanceOf(EventTarget)
     await client.dispose()
     expect(document.body.contains(container)).toBe(false)
     expect('__DSH_TRANSPORT__' in globalThis).toBe(false)
     expect(globals.EventSource).toBeUndefined()
     expect(globals.ResizeObserver).toBeUndefined()
+    expect(globals.matchMedia).toBeUndefined()
     expect(document.fonts).toBeUndefined()
     await client.dispose()
   }, COLD_BOOT_TIMEOUT_MS)
 
   it('leaves a pre-existing global alone and removes only the shims it installed', async () => {
+    const existingMedia = vi.fn()
+    vi.stubGlobal('matchMedia', existingMedia)
     const existing = { existing: true }
     vi.stubGlobal('ResizeObserver', existing)
     const fonts = new EventTarget()
@@ -66,9 +78,11 @@ describe('TestClient (jsdom)', () => {
     })
     const client = await started({ roster: API_ROSTER })
     expect(globals.ResizeObserver).toBe(existing)
+    expect(globals.matchMedia).toBe(existingMedia)
     expect(globals.EventSource).toBeDefined()
     await client.dispose()
     expect(globals.ResizeObserver).toBe(existing)
+    expect(globals.matchMedia).toBe(existingMedia)
     expect(globals.EventSource).toBeUndefined()
     expect(document.fonts).toBe(fonts)
   })
