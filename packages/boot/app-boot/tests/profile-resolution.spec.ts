@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { getEnvironmentData } from 'node:worker_threads'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   installRuntimeInterception,
   registerWorkerResolution,
@@ -31,6 +31,7 @@ import { registerHooksThreadStacks } from './hooks-thread-stack.ts'
 
 const roots: string[] = []
 const registrations: RuntimeInterception[] = []
+
 
 afterEach(() => {
   for (const registration of registrations.splice(0).reverse()) registration.dispose()
@@ -2640,4 +2641,45 @@ describe('runtime resolution', { concurrent: false }, () => {
     registrations.pop()
     expect(() => { require.resolve('@deepseek-ai/dsh-core') }).toThrow(/Cannot find module/u)
   })
+})
+
+it('installs profile routing with exposed internals when the optional addon refuses the runtime', async () => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const f = fixture()
+  const resolver = pathToFileURL(join(import.meta.dirname, '../src/profile-resolution/resolver.ts')).href
+  const profileModule = pathToFileURL(join(import.meta.dirname, '../src/profile.ts')).href
+  const source = `
+    import { createRequire } from 'node:module'
+    import { installRuntimeInterception } from ${JSON.stringify(resolver)}
+    import { createRuntimeResolution } from ${JSON.stringify(profileModule)}
+    const addon = createRequire(${JSON.stringify(import.meta.url)})('node-addon-require-builtin')
+    addon.requireBuiltin = () => { throw new Error('unsupported runtime') }
+    const resolution = await createRuntimeResolution(${JSON.stringify({ installAnchor: f.installAnchor, profile: f.profile, home: f.root })})
+    const registration = installRuntimeInterception(resolution)
+    registration.dispose()
+    console.log('exposed-routing-ok')
+  `
+  const { stdout } = await promisify(execFile)(process.execPath,
+    ['--expose-internals', '--import', 'tsx/esm', '--input-type=module', '-e', source], { timeout: 30_000 })
+  expect(stdout.trim()).toBe('exposed-routing-ok')
+})
+
+
+it('selects the exposed-internals resolver in the running process', async () => {
+  const require = createRequire(import.meta.url)
+  const addon = require('node-addon-require-builtin') as { requireBuiltin(id: string): unknown }
+  const cjs = require('node:module') as { _load(request: string, parent: unknown, isMain: boolean): unknown }
+  const original = cjs._load.bind(cjs)
+  const argv = [...process.execArgv]
+  const spy = vi.spyOn(cjs, '_load').mockImplementation((request, parent, isMain) =>
+    request.startsWith('internal/') ? addon.requireBuiltin(request) : original(request, parent, isMain))
+  process.execArgv.push('--expose-internals')
+  try {
+    const f = fixture()
+    registrations.push(installRuntimeInterception(await resolutionOf(f)))
+  } finally {
+    process.execArgv.splice(0, process.execArgv.length, ...argv)
+    spy.mockRestore()
+  }
 })

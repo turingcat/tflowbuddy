@@ -77,7 +77,10 @@ describe('experimental Inspector real Worker', () => {
     secondCdp = undefined
     await inspector?.close()
     inspector = undefined
-    if (server !== undefined) await new Promise<void>((resolve) => { server!.close(() => { resolve() }) })
+    if (server !== undefined) await new Promise<void>((resolve) => {
+      server!.close(() => { resolve() })
+      server!.closeAllConnections()
+    })
     server = undefined
   })
 
@@ -711,6 +714,12 @@ describe('experimental Inspector real Worker', () => {
         && event.params?.requestId === requestId).map(event => event.params?.data)).toEqual(['first', '[DONE]'])
     })
     abort.abort()
+    // Settle the caller's tee branch as well as the capture branch before inspecting completion.
+    try { await reader.cancel() } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) throw error
+    } finally {
+      reader.releaseLock()
+    }
 
     await vi.waitFor(() => {
       expect(cdp!.events.some(event =>

@@ -130,8 +130,16 @@ export class DesktopProjectManager {
   }
 }
 
-/** Create build-only project metadata for materializing the signed runtime. */
-export function createRuntimeProjectMetadata(projectDir: string, release: DesktopRelease): void {
+/**
+ * Create build-only project metadata for materializing the runtime.
+ * @param projectDir - Staged local package set.
+ * @param release - Desktop release bound to the staged packages.
+ * @param target - Electron platform used to select compatible image binaries.
+ */
+export function createRuntimeProjectMetadata(
+  projectDir: string, release: DesktopRelease,
+  target: { platform: string; arch: string } = { platform: process.platform, arch: process.arch },
+): void {
   mkdirSync(projectDir, { recursive: true, mode: 0o700 })
   const packageSet = verifyDesktopCorePackageSet(projectDir, release.version)
   const manifest = {
@@ -144,7 +152,11 @@ export function createRuntimeProjectMetadata(projectDir: string, release: Deskto
   writeJson(join(projectDir, 'package.json'), manifest)
   writeFileSync(
     join(projectDir, 'pnpm-workspace.yaml'),
-    workspaceFile(desktopCorePackageOverrides(packageSet)),
+    workspaceFile({
+      ...desktopCorePackageOverrides(packageSet),
+      // sharp 0.35's ia32 binary supports Node 20 only; Electron 40 embeds Node 24.
+      ...target.platform === 'win32' && target.arch === 'ia32' ? { sharp: '0.34.5' } : {},
+    }),
     { mode: 0o600 },
   )
 }
