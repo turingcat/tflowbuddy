@@ -164,7 +164,12 @@ async function requestEnvelope(url: string, init: RequestInit, options: TFlowReq
       response.ok ? 'TFlow 服务响应格式异常' : `TFlow 服务不可用（HTTP ${response.status}）`,
       { status: response.status })
   }
-  const envelope = body as unknown as Envelope
+  const envelope: Envelope = {
+    code: body['code'],
+    ...typeof body['message'] === 'string' ? { message: body['message'] } : {},
+    ...typeof body['reason'] === 'string' ? { reason: body['reason'] } : {},
+    data: body['data'],
+  }
   if (envelope.code !== 0) {
     throw new TFlowProtocolError(refusalKind(response.status, envelope.code), envelope.message ?? 'TFlow 请求失败', {
       status: response.status,
@@ -347,7 +352,9 @@ export async function refreshSession(options: TFlowRequestOptions, refreshToken:
 
 /** Panel call authorized by the access token. */
 function authorized(accessToken: string, init: RequestInit = {}): RequestInit {
-  return { ...init, headers: { ...init.headers, Authorization: `Bearer ${accessToken}` } }
+  const headers = new Headers(init.headers)
+  headers.set('Authorization', `Bearer ${accessToken}`)
+  return { ...init, headers: Object.fromEntries(headers.entries()) }
 }
 
 /**
@@ -435,7 +442,7 @@ export async function ensureModelKey(
   }
   const created = await requestEnvelope(`${trimOrigin(options.panelUrl)}/api/v1/keys`, {
     method: 'POST',
-    headers: { ...CONTENT_TYPE_JSON, ...authorized(accessToken).headers, 'Idempotency-Key': idempotencyKey },
+    headers: { ...CONTENT_TYPE_JSON, Authorization: `Bearer ${accessToken}`, 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify({ name: TFLOW_MODEL_KEY_NAME, ...groupId === undefined ? {} : { group_id: Number(groupId) } }),
   }, options)
   if (!isRecord(created)) throw new TFlowProtocolError('protocol', 'TFlow API Key 创建响应格式异常')

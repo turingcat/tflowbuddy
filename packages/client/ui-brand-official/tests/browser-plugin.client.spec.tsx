@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { Context } from '@deepseek-ai/cordis'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { apply, inject } from '../src/client/index.ts'
 import { OfficialBrandMark, OfficialBrandName } from '../src/client/Brand.tsx'
 import { apply as hostApply } from '../src/index.ts'
@@ -20,9 +20,10 @@ const HOLES = [
 const HERO_HOLE = 'conversation.hero.brand.mark'
 
 async function bench(declare = true) {
-  const ctx = new Context()
-  await ctx.plugin(SlotRegistry).await()
-  const slots = ctx.get('slots') as SlotRegistry
+  const runtime = await SlotTestRuntime.create()
+  const { ctx, slots } = runtime
+  ctx.provide('locale', new LocaleRuntime(ctx))
+  onTestFinished(() => runtime.dispose())
   const declareHoles = () => slots.register({
     name: 'root',
     children: Object.fromEntries([...HOLES, HERO_HOLE].map(name => [name, { kind: 'single', scope: 'root' }])),
@@ -37,7 +38,7 @@ describe('official browser-brand plugin', () => {
   })
 
   it('declares only the slot service it uses', () => {
-    expect(inject).toEqual(['slots'])
+    expect(inject).toEqual(['slots', 'locale'])
   })
 
   it('leaves every slot empty outside the official build profile', async () => {
@@ -79,7 +80,7 @@ describe('official browser-brand plugin', () => {
   })
 
   it('renders the official name independently from both requested mark sizes', () => {
-    const name = render(<OfficialBrandName />)
+    const name = render(<OfficialBrandName t={() => 'TFlowBuddy'} />)
     expect(name.container.querySelector('svg')?.getAttribute('viewBox')).toBe('26 0 156 24')
     name.unmount()
 
@@ -90,7 +91,7 @@ describe('official browser-brand plugin', () => {
   })
 })
 it('renders the TFlowBuddy brand name', () => {
-  const name = render(<OfficialBrandName />)
+  const name = render(<OfficialBrandName t={() => 'TFlowBuddy'} />)
   expect(name.container.textContent).toBe('TFlowBuddy')
   name.unmount()
 })

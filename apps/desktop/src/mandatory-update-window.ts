@@ -282,8 +282,8 @@ export class DesktopMandatoryUpdateWindow {
     this.sync()
     try {
       if (action === 'copy') {
-        await clipboard.writeText(url)
-        if (await clipboard.readText() !== url) throw new Error('desktop policy: clipboard did not retain download address')
+        clipboard.writeText(url)
+        if (clipboard.readText() !== url) throw new Error('desktop policy: clipboard did not retain download address')
       }
       else await shell.openExternal(url)
       if (epoch !== this.navigationEpoch || this.disposed) return

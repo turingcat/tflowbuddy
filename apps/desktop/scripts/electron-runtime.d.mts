@@ -20,3 +20,11 @@ export type ElectronRuntimeSource =
  * @returns Pinned distribution source.
  */
 export function resolveElectronRuntimeSource(platform: string, arch: string): ElectronRuntimeSource
+
+/**
+ * Select native build headers for the target Electron distribution.
+ * @param platform - Target platform.
+ * @param arch - Target architecture.
+ * @returns node-gyp environment using Electron rather than standalone Node headers.
+ */
+export function electronNativeBuildEnvironment(platform: string, arch: string): Record<string, string>

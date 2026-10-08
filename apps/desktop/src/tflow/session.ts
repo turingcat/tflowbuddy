@@ -322,11 +322,11 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
       }
     },
 
-    async abandon() {
+    abandon() {
       pending = undefined
       // A signed-in session is what the user returns to; without one the
       // attempt leaves nothing behind, and no stored record is touched either way.
-      return publish(incumbent)
+      return Promise.resolve(publish(incumbent))
     },
 
     async signOut() {

@@ -896,7 +896,8 @@ test('keeps trusted preflight before token minting and required policy unconditi
   const job = source.slice(source.indexOf('  policy:'))
   assert.ok(job.includes('    name: Issue policy'))
   assert.ok(!job.slice(0, job.indexOf('    steps:')).includes('    if:'))
-  assert.ok(source.includes('types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review, review_requested]'))
+  assert.match(source, /on:\s*\n  workflow_dispatch:/)
+  assert.doesNotMatch(source, /^  pull_request:/m)
   const steps = job.split('      - name: ').slice(1)
   assert.equal(steps.length, 4)
   assert.ok(steps[0].includes('ref: ${{ github.event.repository.default_branch }}'))
@@ -956,13 +957,10 @@ test('runs trusted rollout selection with absent and present capability markers'
   }
 })
 
-test('allocates lifecycle runners only for relevant reviews and PR body edits', () => {
+test('keeps upstream lifecycle manual-only with trusted checkout and event guards', () => {
   const source = readFileSync(new URL('../workflows/issue-lifecycle.yml', import.meta.url), 'utf8')
-  const issues = source.split('  issues:')[1].split('  pull_request:')[0]
-  const pulls = source.split('  pull_request:')[1].split('  pull_request_review:')[0]
-  const actions = (block) => [...block.matchAll(/^      - (\w+)$/gm)].map((match) => match[1])
-  assert.deepEqual(actions(issues), ['opened', 'edited', 'labeled', 'unlabeled', 'closed', 'reopened', 'typed', 'untyped', 'field_added', 'field_removed'])
-  assert.deepEqual(actions(pulls), ['opened', 'edited', 'reopened', 'review_requested'])
+  assert.match(source, /on:\s*\n  workflow_dispatch:/)
+  assert.doesNotMatch(source, /^  (issues|pull_request|pull_request_review):/m)
   const job = source.slice(source.indexOf('  lifecycle:'))
   const beforeSteps = job.slice(0, job.indexOf('    steps:'))
   assert.ok(beforeSteps.includes('    if: >-'))

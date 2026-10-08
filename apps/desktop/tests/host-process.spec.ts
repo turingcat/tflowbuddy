@@ -62,7 +62,10 @@ function projectWithHost(source = HTTP_HOST): string {
 function hostProcess(
   runtime: string, profile = runtime, onFailure?: (error: Error) => void, environment = process.env,
 ): DesktopHostProcess {
-  const host = new DesktopHostProcess(process.execPath, runtime, profile, undefined, environment, onFailure)
+  const fixtureEnvironment = { ...environment }
+  delete fixtureEnvironment.FORCE_COLOR
+  delete fixtureEnvironment.NO_COLOR
+  const host = new DesktopHostProcess(process.execPath, runtime, profile, undefined, fixtureEnvironment, onFailure)
   hosts.push(host)
   return host
 }

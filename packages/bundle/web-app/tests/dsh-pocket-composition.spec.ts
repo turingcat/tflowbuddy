@@ -30,9 +30,13 @@ it('mounts dsh-pocket after the web transport and declares it as a runtime bundl
 })
 
 it('disables update and restart RPC actions when the Desktop marker is supplied', async () => {
-  const { installPocketRpc } = await import(`${packageRoot}/lib/web-rpc.js`)
-  const { POCKET_ENDPOINTS } = await import(`${packageRoot}/client/api.js`)
-  const handler = vi.fn()
+  const { installPocketRpc } = await import(`${packageRoot}/lib/web-rpc.js`) as {
+    installPocketRpc: (ctx: object, options: object) => (() => void) | undefined
+  }
+  const { POCKET_ENDPOINTS } = await import(`${packageRoot}/client/api.js`) as {
+    POCKET_ENDPOINTS: { update: string; restart: string }
+  }
+  const handler = vi.fn<(endpoint: string, payload: object) => Promise<unknown>>()
   const service = { status: vi.fn(async () => ({ dshPort: 3080 })), stopTunnel: vi.fn() }
   const runUpdate = { perform: vi.fn(async () => ({ ok: true })) }
   const restart = vi.fn(() => ({ helperPid: 123 }))

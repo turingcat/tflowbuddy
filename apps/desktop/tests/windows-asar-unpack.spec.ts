@@ -25,7 +25,7 @@ vi.mock('../scripts/windows-runtime-signature.mjs', async importOriginal => ({
   signWindowsCode: async () => {},
 }))
 // Vite's root-relative IDs also resolve mocked build outputs on a clean checkout.
-vi.mock('../lib/types/runtime-tree.js', () => ({ verifyDesktopRuntime: async () => {} }))
+vi.mock('/apps/desktop/lib/types/runtime-tree.js', () => ({ verifyDesktopRuntime: async () => {} }))
 vi.mock('node:crypto', async importOriginal => ({
   ...await importOriginal<typeof import('node:crypto')>(),
   X509Certificate: class { fingerprint = 'AA:BB' },

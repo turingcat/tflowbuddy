@@ -88,7 +88,6 @@ export async function openWelcomeWindow(
     if (!window.isDestroyed()) window.destroy()
     throw error
   }
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- another window can replace ownership during loadFile.
   if (disposeActiveHandlers === disposeHandlers && !window.isDestroyed()) window.show()
   return window
 }

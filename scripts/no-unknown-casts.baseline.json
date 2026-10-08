@@ -41,9 +41,6 @@
   "apps/desktop/src/runtime-tree.ts": {
     "bd54ced9c67761b49e3d039cb8eb6cbcb22f1e9e51b903a3b98ed8364863fac0": 1
   },
-  "apps/desktop/tests/desktop-policy-environment.spec.ts": {
-    "d021e1acc96493233ec8a9cba000e9847acded67c39d913fa893761aaf917250": 1
-  },
   "apps/desktop/tests/directory-picker.spec.ts": {
     "326597b335539db945b2e3b7c86638d40849d2077c0a5670d064e45486f4e407": 1,
     "f085ad10d79aed4354f06c71f72760cae58e097b15c83f13a96176f27529e638": 1

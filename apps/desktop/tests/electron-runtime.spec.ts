@@ -5,9 +5,20 @@ import {
   ELECTRON_VERSION,
   WINDOWS_COMMUNITY_ELECTRON,
   resolveElectronRuntimeSource,
+  electronNativeBuildEnvironment,
 } from '../scripts/electron-runtime.mjs'
 
 describe('electron runtime source', () => {
+  it.each([['win32', 'ia32', '40.2.0'], ['win32', 'x64', '40.2.0'], ['darwin', 'arm64', '40.10.6']])(
+    'uses Electron headers for native dependencies on %s/%s', (platform, arch, version) => {
+      expect(electronNativeBuildEnvironment(platform, arch)).toEqual({
+        npm_config_runtime: 'electron',
+        npm_config_target: version,
+        npm_config_disturl: 'https://www.electronjs.org/headers',
+        npm_config_arch: arch,
+      })
+    },
+  )
   it('selects the official Electron 40.10.6 artifact for macOS arm64', () => {
     expect(resolveElectronRuntimeSource('darwin', 'arm64')).toMatchObject({
       kind: 'official',
@@ -78,7 +89,7 @@ describe('electron runtime source', () => {
 
   it('pins the desktop dev dependency to Electron 40.10.6', () => {
     expect(
-      JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).devDependencies
+      (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { devDependencies: { electron: string } }).devDependencies
         .electron,
     ).toBe('40.10.6')
   })

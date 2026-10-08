@@ -62,10 +62,10 @@ describe('encodeTFlowCredentials', () => {
 
   it('omits the optional fields a panel without them leaves unset', () => {
     const { groupId: _groupId, ...withoutGroup } = CREDENTIALS
-    const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials({
+    const parsed = JSON.parse(encodeTFlowCredentials({
       ...withoutGroup,
       session: { accessToken: 'access-token' },
-    }, fakeVault()))
+    }, fakeVault())) as Record<string, unknown>
     expect('refreshToken' in parsed).toBe(false)
     expect('groupId' in parsed).toBe(false)
   })
@@ -108,31 +108,31 @@ describe('decodeTFlowCredentials', () => {
   })
 
   it('rejects a record whose secrets are absent', () => {
-    const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault()))
+    const parsed = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault())) as Record<string, unknown>
     delete parsed['accessToken']
     expect(() => decodeTFlowCredentials(parsed, fakeVault())).toThrow(/accessToken/u)
   })
 
   it('rejects an empty sealed field', () => {
-    const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault()))
+    const parsed = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault())) as Record<string, unknown>
     parsed['modelKey'] = ''
     expect(() => decodeTFlowCredentials(parsed, fakeVault())).toThrow(/modelKey/u)
   })
 
   it('rejects a sealed field that decodes to no bytes', () => {
-    const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault()))
+    const parsed = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault())) as Record<string, unknown>
     parsed['modelKey'] = '===='
     expect(() => decodeTFlowCredentials(parsed, fakeVault())).toThrow(/not sealed content/u)
   })
 
   it('rejects an optional field present but empty', () => {
-    const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault()))
+    const parsed = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault())) as Record<string, unknown>
     parsed['groupId'] = ''
     expect(() => decodeTFlowCredentials(parsed, fakeVault())).toThrow(/groupId/u)
   })
 
   it('rejects a secret the vault cannot unseal', () => {
-    const parsed: Record<string, unknown> = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault()))
+    const parsed = JSON.parse(encodeTFlowCredentials(CREDENTIALS, fakeVault())) as Record<string, unknown>
     parsed['accessToken'] = Buffer.from('plaintext', 'utf8').toString('base64')
     expect(() => decodeTFlowCredentials(parsed, fakeVault())).toThrow(/not sealed by this vault/u)
   })
@@ -160,12 +160,12 @@ describe('createTFlowCredentialStore', () => {
 
   it('reports an unreadable document as unusable rather than as an absence', async () => {
     const store = createTFlowCredentialStore(fakeVault(), memoryFiles('{not json'))
-    await expect(store.load()).resolves.toMatchObject({ kind: 'unusable', reason: expect.stringMatching(/not valid JSON/u) })
+    await expect(store.load()).resolves.toMatchObject({ kind: 'unusable', reason: expect.stringMatching(/not valid JSON/u) as string })
   })
 
   it('reports a well-formed document this build cannot trust as unusable', async () => {
     const store = createTFlowCredentialStore(fakeVault(), memoryFiles(JSON.stringify({ version: 9, siteKind: 'tflow' })))
-    await expect(store.load()).resolves.toMatchObject({ kind: 'unusable', reason: expect.stringMatching(/unsupported record version/u) })
+    await expect(store.load()).resolves.toMatchObject({ kind: 'unusable', reason: expect.stringMatching(/unsupported record version/u) as string })
   })
 
   it('names the failure when a document decodes to a non-Error', async () => {

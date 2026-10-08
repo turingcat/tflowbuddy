@@ -27,6 +27,8 @@ kind: "package-reference"
 
 在采用 TFlowBuddy 品牌的部署中，将本插件挂载到浏览器插件名单，然后以 `official` profile 构建客户端，让填充得以注册。
 
+浏览器插件依赖 locale 服务，并注册 `brand.tflow` 字典来提供字标文本和无障碍标签；英文和中文均保留注册的产品名称。
+
 ### 选择 profile
 
 `DSH_CLIENT_BUILD_PROFILE` 决定渲染哪个品牌。`official` 构建在侧栏显示官方标志与名称；任何其他取值都让外壳回退——TFlow 徽标与本地构建标签——保持原样。会话首屏无论 profile 如何都显示来自 `dsh-client-ui-conversation` 的动画首屏鱼，因为这个回退本身就是官方标志。两种情况下插件都会照常加载并通过校验；只有注册受 profile 门控。

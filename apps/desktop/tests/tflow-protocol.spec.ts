@@ -46,6 +46,12 @@ function queued(
   return Object.assign(fetchImpl, { calls })
 }
 
+/** Read the JSON request emitted by the protocol fixture. */
+function parseRequestBody(body: RequestInit['body']): unknown {
+  if (typeof body !== 'string') throw new Error('Expected a JSON request body')
+  return JSON.parse(body)
+}
+
 describe('gatewayRoot', () => {
   it('normalizes an advertised address to a single /v1 root', () => {
     expect(gatewayRoot('https://tflow.online')).toBe('https://tflow.online/v1')
@@ -113,7 +119,7 @@ describe('signIn', () => {
     await expect(signIn({ ...OPTIONS, fetch: fetchImpl }, { email: 'a@b.c', password: 'secret', captchaProof: 'proof' }))
       .resolves.toEqual({ kind: 'authenticated', session: { accessToken: 'access', refreshToken: 'refresh' } })
     expect(fetchImpl.calls[0]?.url).toBe('https://tflow.online/api/v1/auth/login')
-    expect(JSON.parse(String(fetchImpl.calls[0]?.init?.body))).toEqual({
+    expect(parseRequestBody(fetchImpl.calls[0]?.init?.body)).toEqual({
       email: 'a@b.c', password: 'secret', turnstile_token: 'proof',
     })
   })
@@ -227,7 +233,7 @@ describe('completeTwoFactor', () => {
     await expect(completeTwoFactor({ ...OPTIONS, fetch: fetchImpl }, { tempToken: 'temp' }, '123456'))
       .resolves.toEqual({ accessToken: 'access' })
     expect(fetchImpl.calls[0]?.url).toBe('https://tflow.online/api/v1/auth/login/2fa')
-    expect(JSON.parse(String(fetchImpl.calls[0]?.init?.body))).toEqual({ temp_token: 'temp', totp_code: '123456' })
+    expect(parseRequestBody(fetchImpl.calls[0]?.init?.body)).toEqual({ temp_token: 'temp', totp_code: '123456' })
   })
 
   it.each(['12345', '1234567', 'abcdef', ''])('refuses the malformed code %j before any request', async (code) => {
@@ -243,7 +249,7 @@ describe('refreshSession', () => {
     const fetchImpl = queued(envelope({ access_token: 'next-access', refresh_token: 'next-refresh' }))
     await expect(refreshSession({ ...OPTIONS, fetch: fetchImpl }, 'refresh'))
       .resolves.toEqual({ accessToken: 'next-access', refreshToken: 'next-refresh' })
-    expect(JSON.parse(String(fetchImpl.calls[0]?.init?.body))).toEqual({ refresh_token: 'refresh' })
+    expect(parseRequestBody(fetchImpl.calls[0]?.init?.body)).toEqual({ refresh_token: 'refresh' })
   })
 })
 
@@ -252,7 +258,7 @@ describe('fetchAccount', () => {
     const fetchImpl = queued(envelope({ email: 'alice@example.com', balance: 12.34 }))
     await expect(fetchAccount({ ...OPTIONS, fetch: fetchImpl }, 'access'))
       .resolves.toEqual({ displayName: 'alice', balance: 12.34 })
-    expect(fetchImpl.calls[0]?.init?.headers).toEqual({ Authorization: 'Bearer access' })
+    expect(new Headers(fetchImpl.calls[0]?.init?.headers).get('Authorization')).toBe('Bearer access')
   })
 
   it('rejects an account payload without a deliverable address', async () => {
@@ -313,7 +319,7 @@ describe('ensureModelKey', () => {
     const created = fetchImpl.calls[1]
     expect(created?.init?.method).toBe('POST')
     expect(created?.init?.headers).toMatchObject({ 'Idempotency-Key': 'idem' })
-    expect(JSON.parse(String(created?.init?.body))).toEqual({ name: TFLOW_MODEL_KEY_NAME, group_id: 7 })
+    expect(parseRequestBody(created?.init?.body)).toEqual({ name: TFLOW_MODEL_KEY_NAME, group_id: 7 })
   })
 
   it('ignores a key the panel no longer reports as active', async () => {
@@ -329,7 +335,7 @@ describe('ensureModelKey', () => {
     await expect(ensureModelKey({ ...OPTIONS, fetch: fetchImpl }, 'access', undefined, 'idem'))
       .resolves.toEqual({ key: 'sk-ungrouped' })
     expect(fetchImpl.calls[0]?.url).not.toContain('group_id')
-    expect(JSON.parse(String(fetchImpl.calls[1]?.init?.body))).toEqual({ name: TFLOW_MODEL_KEY_NAME })
+    expect(parseRequestBody(fetchImpl.calls[1]?.init?.body)).toEqual({ name: TFLOW_MODEL_KEY_NAME })
   })
 
   it('refuses a non-numeric group before asking the panel to create anything', async () => {
@@ -465,7 +471,7 @@ describe('listModels', () => {
     await expect(listModels({ ...OPTIONS, gatewayUrl: 'https://tflow.online', fetch: fetchImpl }, 'sk'))
       .resolves.toEqual([{ id: 'glm-5' }, { id: 'qwen3' }])
     expect(fetchImpl.calls[0]?.url).toBe('https://tflow.online/v1/models')
-    expect(fetchImpl.calls[0]?.init?.headers).toEqual({ Authorization: 'Bearer sk' })
+    expect(new Headers(fetchImpl.calls[0]?.init?.headers).get('Authorization')).toBe('Bearer sk')
   })
 
   it('accepts an advertised address that already carries the version segment', async () => {

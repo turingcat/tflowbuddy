@@ -17,7 +17,7 @@ it('excludes the prebuilt dsh-pocket from both tsdown workspace faces', () => {
 
 it.each([false, true])('builds ordinary workspaces without compiling prebuilt dsh-pocket (client: %s)', async (client) => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-tsdown-workspace-'))
-  onTestFinished(() => rmSync(root, { recursive: true, force: true }))
+  onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
   const directories = ['vendor/cordis', 'vendor/dsh-pocket', 'vendor/dsh-pocket-extra', 'packages/core/runtime', 'apps/cli', 'apps/desktop-host']
   for (const dir of directories) {
     mkdirSync(join(root, dir), { recursive: true })

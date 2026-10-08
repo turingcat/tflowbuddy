@@ -45,8 +45,8 @@ export function installTFlowLoginIpc(
   // The renderer supplies one payload object; the driver validates each field,
   // because a renderer is untrusted input even when the form produced it.
   request<TFlowLoginView>(TFLOW_IPC.start, ([input]) => backend.start((input ?? {}) as TFlowStartInput))
-  request<TFlowLoginView>(TFLOW_IPC.complete, ([code]) => backend.complete(String(code ?? '')))
-  request<TFlowLoginView>(TFLOW_IPC.selectGroup, ([groupId]) => backend.selectGroup(String(groupId ?? '')))
+  request<TFlowLoginView>(TFLOW_IPC.complete, ([code]) => backend.complete(typeof code === 'string' ? code : ''))
+  request<TFlowLoginView>(TFLOW_IPC.selectGroup, ([groupId]) => backend.selectGroup(typeof groupId === 'string' ? groupId : ''))
   request<TFlowLoginView>(TFLOW_IPC.signOut, () => backend.signOut())
   request<TFlowLoginView>(TFLOW_IPC.cancel, () => backend.cancel())
   request<void>(TFLOW_IPC.enterWorkspace, () => enterWorkspace())

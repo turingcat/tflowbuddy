@@ -155,8 +155,10 @@ function checkHtml() {
 }
 
 try {
-  const builtin = requireRuntime('node-addon-require-builtin')
-  assert.equal(typeof builtin.requireBuiltin('internal/modules/esm/loader').getOrInitializeCascadedLoader, 'function')
+  // Desktop launches with --expose-internals; verify the production Loader path, not an unsupported optional addon.
+  assert.ok(process.execArgv.includes('--expose-internals'))
+  const { ModuleLoader } = await import(pathToFileURL(requireRuntime.resolve('@deepseek-ai/cordis-plugin-loader')).href)
+  assert.ok(ModuleLoader.fromInternal(), 'Desktop Loader must reach the Electron internal ESM loader')
   checkPnpm()
   checkKoffi()
   await checkSharp()

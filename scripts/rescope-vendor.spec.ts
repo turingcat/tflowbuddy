@@ -9,6 +9,7 @@ const INSERTED = `\n15. **rescope**: one log entry.\n${ANCHOR}`
 describe('rescope file selection', () => {
   it('preserves the recorded npm resolution', () => {
     expect(isRescopeExcluded('scripts/dependency-catalog/package-lock.json')).toBe(true)
+    expect(isRescopeExcluded('vendor/dsh-pocket/package-lock.json')).toBe(true)
   })
 
   it.each([
