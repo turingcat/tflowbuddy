@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">TFlow badge mark</title>
+  <desc id="desc">A bright TFlow badge with a signal notch.</desc>
+  <defs><linearGradient id="badge" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#14b8a6"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="224" fill="#071827"/>
+  <path d="M220 222h584a48 48 0 0 1 48 48v360a48 48 0 0 1-48 48H592l-80 124-80-124H220a48 48 0 0 1-48-48V270a48 48 0 0 1 48-48Z" fill="#14b8a6"/>
+  <path d="M310 376h404" fill="none" stroke="#fff" stroke-width="70" stroke-linecap="round"/>
+  <path d="M512 376v272" fill="none" stroke="#fff" stroke-width="70" stroke-linecap="round"/>
+  <path d="M350 712h324" fill="none" stroke="#d9fffa" stroke-width="18" stroke-linecap="round"/>
+</svg>

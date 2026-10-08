@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">TFlow flowline mark</title>
+  <desc id="desc">A teal and blue flowing T mark on a deep navy field.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#071827"/><stop offset="1" stop-color="#0d3140"/></linearGradient>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#2dd4bf"/><stop offset="1" stop-color="#60a5fa"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <path d="M230 300h564" fill="none" stroke="#2dd4bf" stroke-width="92" stroke-linecap="round"/>
+  <path d="M512 300v402c0 93-43 145-126 160" fill="none" stroke="#2dd4bf" stroke-width="92" stroke-linecap="round"/>
+  <path d="M230 386h370c91 0 153 38 186 114" fill="none" stroke="#d9fffa" stroke-opacity=".92" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="230" cy="300" r="26" fill="#d9fffa"/><circle cx="794" cy="300" r="26" fill="#60a5fa"/>
+</svg>

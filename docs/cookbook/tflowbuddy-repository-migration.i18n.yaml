@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for tflowbuddy-repository-migration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/cookbook/tflowbuddy-repository-migration.md
+/tflowbuddy-repository-migration:
+  en: 8624fa6f7ca873ce
+  zh: f1bc7074fcc79bca
+/tflowbuddy-repository-migration/repository-ownership:
+  en: 6c20d7f2635876dd
+  zh: 12fcce599ae60633
+/tflowbuddy-repository-migration/workflow-prerequisites:
+  en: da3c6095a6569906
+  zh: 24f034b717e5588a
+/tflowbuddy-repository-migration/verification-and-recovery:
+  en: 250dcb6d13198198
+  zh: 03ebcb671c4305cb

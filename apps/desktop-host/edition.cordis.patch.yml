@@ -1,0 +1,20 @@
+# TFlowBuddy edition overlay: rows the shared base and web-app bundles declare
+# that this product cannot serve. The Host passes this file as a `--patch`
+# overlay, which applies after the profile's and the home's user layers, so an
+# existing profile patch cannot leave a row enabled.
+
+# The generic DeepSeek launcher reports a separate account state and shadows the TFlow launcher.
+- id: ui-settings-account
+  disabled: true
+
+# TFlow accounts sign in through the TFlow panel, not the DeepSeek Platform.
+- id: deepseek-account
+  disabled: true
+
+# The direct DeepSeek adapter serves a provider and models this account cannot reach.
+- id: llm-deepseek
+  disabled: true
+
+# Windows ia32 omits Python and the bundled Office conversion engine.
+- id: office-to-pdf
+  disabled: !!js "process.platform === 'win32' && process.arch === 'ia32'"

@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for tflowbuddy-account-surface-decision.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/tflowbuddy-account-surface-decision.md
+/tflowbuddy-next-step-choice-typesafe-judgment-record:
+  en: ab3c47b016c21b3a
+  zh: 95e927ed7faf2c66
+/tflowbuddy-next-step-choice-typesafe-judgment-record/1-state:
+  en: e214a3a999afe918
+  zh: f7d1e7d53f9a6548
+/tflowbuddy-next-step-choice-typesafe-judgment-record/2-questions:
+  en: 2320cb32e90156d1
+  zh: d049448d4242f7e0
+/tflowbuddy-next-step-choice-typesafe-judgment-record/3-raw-answers:
+  en: 906e455e2940c560
+  zh: bf4d72deae22581f
+/tflowbuddy-next-step-choice-typesafe-judgment-record/4-how-code-consumes-these-answers:
+  en: 7c21d456065a6e7c
+  zh: 5ce9a36d48c5c537
+/tflowbuddy-next-step-choice-typesafe-judgment-record/5-conclusion:
+  en: 4ab72d4c90cb2913
+  zh: a1eb9c826b65c667
+/tflowbuddy-next-step-choice-typesafe-judgment-record/6-user-override-2026-09-22:
+  en: 3a2bb6ebdb4dbe30
+  zh: 133939c65386ccd1
+/tflowbuddy-next-step-choice-typesafe-judgment-record/7-reproducing:
+  en: c9dda0941e17a545
+  zh: 0f79be253dde1f17

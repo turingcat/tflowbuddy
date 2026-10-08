@@ -1,0 +1,13 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write apps/desktop/resources/tflow-candidates/README.md
+/tflow-desktop-brand-candidates:
+  en: 0f14a1ae7e87c4eb
+  zh: 13521713e136ac34
+/tflow-desktop-brand-candidates/jev-score-rubric:
+  en: 2135c380b464ffd9
+  zh: 2c9820c41a4003fd
+/tflow-desktop-brand-candidates/candidate-directions:
+  en: 83c07afbd2000467
+  zh: 243d126d488cf4d9

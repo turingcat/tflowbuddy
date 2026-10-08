@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for tflowbuddy-real-machine-verification.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/tflowbuddy-real-machine-verification.md
+/tflowbuddy-real-machine-verification-checklist:
+  en: 1acb63654243839a
+  zh: 4b8f4c7886f4cabf
+/tflowbuddy-real-machine-verification-checklist/0-prerequisite-the-shell-environment:
+  en: 9e16e1c8d4e2250a
+  zh: 9e16e1c8d4e2250a
+/tflowbuddy-real-machine-verification-checklist/1-launch:
+  en: 2d70d601b1ef0339
+  zh: 2d70d601b1ef0339
+/tflowbuddy-real-machine-verification-checklist/2-sign-in:
+  en: c5d8d3f92baa2291
+  zh: c5d8d3f92baa2291
+/tflowbuddy-real-machine-verification-checklist/3-models-and-the-default-model:
+  en: 1bb7852755a6c41e
+  zh: 1bb7852755a6c41e
+/tflowbuddy-real-machine-verification-checklist/4-conversation:
+  en: 653d2c4eededf896
+  zh: 653d2c4eededf896
+/tflowbuddy-real-machine-verification-checklist/5-what-to-report-back:
+  en: a6fec8a1d00f1b45
+  zh: a6fec8a1d00f1b45
+/tflowbuddy-real-machine-verification-checklist/6-out-of-scope-for-this-checklist:
+  en: 7ee67473878bba92
+  zh: 7ee67473878bba92

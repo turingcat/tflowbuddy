@@ -1,0 +1,130 @@
+name: Release TFlowBuddy Desktop
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  desktop:
+    name: Desktop / ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: win-x64
+            runner: windows-2025
+            platform: win32
+            arch: x64
+            extension: exe
+            shell: pwsh
+          - target: win-ia32
+            runner: windows-2025
+            platform: win32
+            arch: ia32
+            extension: exe
+            shell: pwsh
+          - target: mac-arm64
+            runner: macos-15
+            platform: darwin
+            arch: arm64
+            extension: dmg
+            shell: bash
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify release version and build host
+        env:
+          TARGET_PLATFORM: ${{ matrix.platform }}
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, writeFileSync } from "node:fs";
+            import { resolveElectronRuntimeSource } from "./apps/desktop/scripts/electron-runtime.mjs";
+            const readVersion = path => JSON.parse(readFileSync(path, "utf8")).version;
+            const version = readVersion("apps/desktop/package.json");
+            if (version !== readVersion("package.json")) throw new Error("Desktop and workspace versions differ");
+            if (process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME !== `v${version}`) {
+              throw new Error(`Release tag must be v${version}`);
+            }
+            if (process.platform !== process.env.TARGET_PLATFORM || (process.env.TARGET_ARCH !== "ia32" && process.arch !== process.env.TARGET_ARCH)) {
+              throw new Error("Build host does not match the desktop target");
+            }
+            const source = resolveElectronRuntimeSource(process.env.TARGET_PLATFORM, process.env.TARGET_ARCH);
+            console.log(`Electron runtime: ${source.kind} ${source.version} ${source.platform}/${source.arch}`);
+            const suffix = process.platform === "win32" ? "windows" : "macos";
+            writeFileSync(`apps/desktop/.env.${suffix}`, "DSH_DESKTOP_NPM_REGISTRY=https://registry.npmjs.org\n");
+          '
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check product versions
+        run: pnpm run product:version:check
+      - name: Test desktop runtime packaging
+        run: >-
+          pnpm exec vitest run scripts/tests/desktop-release.spec.ts
+          apps/desktop/tests/electron-runtime.spec.ts
+          apps/desktop/tests/desktop-build-paths.spec.ts
+          apps/desktop/tests/package-target.spec.ts
+          apps/desktop/tests/runtime-source-preparation.spec.ts
+          apps/desktop/tests/primary-runtime-preparation.spec.ts
+      - name: Package desktop with bundled runtime
+        run: pnpm --dir apps/desktop run package ${{ matrix.target }} --unsigned
+      - name: Upload desktop installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: tflowbuddy-${{ matrix.target }}
+          path: apps/desktop/.desktop-build/targets/${{ matrix.target }}/unsigned-artifacts/tflowbuddy-*.${{ matrix.extension }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish desktop installers
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: desktop
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: tflowbuddy-*
+          path: installers
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          installers=(installers/tflowbuddy-*.exe installers/tflowbuddy-*.dmg)
+          if [ "${#installers[@]}" -ne 3 ]; then
+            echo 'Expected Windows x64, Windows ia32, and macOS ARM64 installers' >&2
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${installers[@]}"
+          else
+            gh release create "$RELEASE_TAG" "${installers[@]}" --verify-tag --generate-notes --title "TFlowBuddy ${RELEASE_TAG#v}"
+          fi

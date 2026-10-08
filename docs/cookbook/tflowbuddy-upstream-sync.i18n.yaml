@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for tflowbuddy-upstream-sync.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/cookbook/tflowbuddy-upstream-sync.md
+/synchronizing-tflowbuddy-with-dsh:
+  en: 405e2eb2dd9a2714
+  zh: 620cf83845a69a24
+/synchronizing-tflowbuddy-with-dsh/scope:
+  en: 8bc230279c7b7d2f
+  zh: cfe47ac5e879bcf6
+/synchronizing-tflowbuddy-with-dsh/import:
+  en: 46bc34e3c6828d7b
+  zh: 179b2eb4b626e304
+/synchronizing-tflowbuddy-with-dsh/conflicts:
+  en: 66c2f594e27a39c4
+  zh: c987a203f332435d

@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.1-alpha.1/electron40-runtime/guide.md
+/:
+  en: 75acd7e51e52ce09
+  zh: 161a2bac6c091b8f
+/desktop-electron-40-runtime:
+  en: 9b3b76818991d824
+  zh: abe5f91b79d8ac62
+/desktop-electron-40-runtime/change:
+  en: 26c4fbc4f3b4c367
+  zh: ee11babfe6d7ea24
+/desktop-electron-40-runtime/migration:
+  en: 65fa79c5700654d1
+  zh: 360dd8222d09eccf

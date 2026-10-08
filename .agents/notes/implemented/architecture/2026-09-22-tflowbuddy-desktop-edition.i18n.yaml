@@ -1,0 +1,46 @@
+# Bilingual-pair consistency record for 2026-09-22-tflowbuddy-desktop-edition.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-22-tflowbuddy-desktop-edition.md
+/agent-note-tflowbuddy-desktop-edition:
+  en: a3599e79fc76812d
+  zh: 63c63d7be91a11f8
+/agent-note-tflowbuddy-desktop-edition/problem:
+  en: e2cca3fd43efb2ce
+  zh: c550ba34d417568e
+/agent-note-tflowbuddy-desktop-edition/decision:
+  en: d1cef047f23c6af2
+  zh: fa8d6562b09ea72b
+/agent-note-tflowbuddy-desktop-edition/decision/product-identity-is-one-manifest:
+  en: 438a24ba07737a7e
+  zh: c839850ee7441ba8
+/agent-note-tflowbuddy-desktop-edition/decision/sign-in-is-the-panel-s-own-flow:
+  en: a83718bfd8b47d54
+  zh: 0ff7ddd0be68fa12
+/agent-note-tflowbuddy-desktop-edition/decision/credentials-are-desktop-owned-and-vault-sealed:
+  en: af5bf941ad943ec9
+  zh: 98ab7bb9b3f76f09
+/agent-note-tflowbuddy-desktop-edition/decision/the-model-provider-reuses-the-existing-adapter:
+  en: 0da57f645ba7ef99
+  zh: 5d345022bba38928
+/agent-note-tflowbuddy-desktop-edition/decision/the-retired-deepseek-surface-is-gone-not-hidden:
+  en: 18289c9b5484ceeb
+  zh: 9190b3640b5f89a1
+/agent-note-tflowbuddy-desktop-edition/decision/language:
+  en: a7e714d77a3a1a60
+  zh: 423c90f047b157da
+/agent-note-tflowbuddy-desktop-edition/decision/the-panel-contract-this-build-implements:
+  en: af5c3218f477dd7b
+  zh: 7d903bb2e6bda05e
+/agent-note-tflowbuddy-desktop-edition/decision/what-shipped-in-this-phase:
+  en: 4f8727041d79899c
+  zh: 13bbaba3f97fa976
+/agent-note-tflowbuddy-desktop-edition/alternatives-considered:
+  en: ff02b555071474a2
+  zh: 443ed93349cba448
+/agent-note-tflowbuddy-desktop-edition/consequences:
+  en: e336cd98492ec49e
+  zh: 316ae48afe21d0b6
+/agent-note-tflowbuddy-desktop-edition/verification:
+  en: 8823652a2f2ef6f6
+  zh: 22087a04cf8d4c0c

@@ -1,0 +1,34 @@
+# Bilingual-pair consistency record for 2026-10-08-tflowbuddy-independent-repository-design.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/superpowers/specs/2026-10-08-tflowbuddy-independent-repository-design.md
+/tflowbuddy-independent-repository-design:
+  en: 494c4012df1d3a2b
+  zh: c6fb1e763e5d5818
+/tflowbuddy-independent-repository-design/status:
+  en: d251de190d809504
+  zh: b63f22ccba078dca
+/tflowbuddy-independent-repository-design/goal:
+  en: 2c07b259c70185aa
+  zh: 348dd8250040fbae
+/tflowbuddy-independent-repository-design/repository-migration:
+  en: dcb113ce8ca933be
+  zh: a76b047c2e248db2
+/tflowbuddy-independent-repository-design/upstream-synchronization:
+  en: 249edaa69d37ce82
+  zh: a528ca1533264b70
+/tflowbuddy-independent-repository-design/independent-versions:
+  en: ff1216b17b47d814
+  zh: 843576560ca073ee
+/tflowbuddy-independent-repository-design/github-configuration-and-release-handling:
+  en: 32afc839e79b01b1
+  zh: e882d619f24e0c51
+/tflowbuddy-independent-repository-design/verification:
+  en: 623659240d141818
+  zh: f0666a770ac8818e
+/tflowbuddy-independent-repository-design/recovery:
+  en: c507267179560b33
+  zh: d57e43457717112b
+/tflowbuddy-independent-repository-design/non-goals:
+  en: 090e91e747274ea4
+  zh: 8255d2f6c3d3ed33
