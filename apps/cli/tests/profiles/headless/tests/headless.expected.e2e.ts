@@ -84,7 +84,7 @@ async function expectHeadlessStream(normalized: string, expectedPath: string): P
 
 /** Serve one deterministic DeepSeek-compatible response while retaining its request body. */
 async function deepseekDefaultsServer(
-  options: { waitForTitleRequest?: boolean; piAiCompatibility?: true } = {},
+  options: { waitForTitleRequest?: boolean; piAiCompatibility?: true; firstResponseDelayMs?: number } = {},
 ): Promise<DeepSeekDefaultsServer> {
   const requests: JsonObject[] = []
   const paths: string[] = []
@@ -123,7 +123,7 @@ async function deepseekDefaultsServer(
           '',
         ].join('\n\n'))
       }
-      let timer = setTimeout(write, 60)
+      let timer = setTimeout(write, requests.length === 1 ? options.firstResponseDelayMs ?? 60 : 60)
       response.once('close', () => { clearTimeout(timer) })
     })
   })
@@ -584,7 +584,7 @@ describe('headless stream-json snapshots', () => {
   }, LOADER_SMOKE_TEST_TIMEOUT_MS)
 
   it('keeps provider comments alive and sends DeepSeek defaults through the one-shot app', async () => {
-    const server = await deepseekDefaultsServer()
+    const server = await deepseekDefaultsServer({ firstResponseDelayMs: 200 })
     try {
       const result = await runLoaderSmoke({
         label: 'DeepSeek adapter defaults headless stream-json snapshot',

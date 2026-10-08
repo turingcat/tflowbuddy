@@ -15,8 +15,8 @@
   en: d40d2e9c5e967b8e
   zh: 04d78785723d2753
 /deepseek-harness-desktop/key-technical-decisions/bundled-workspace-dependencies:
-  en: 968a43f7183d7b32
-  zh: fc207cbffde0e36b
+  en: 4f37693e5b66f003
+  zh: dd43e3b65aff002a
 /deepseek-harness-desktop/bundled-command-runtime:
   en: 09f0b75af9f0ed14
   zh: 60bbc2e67d5e87a8
@@ -45,8 +45,8 @@
   en: 8cb1a4623bd87f2a
   zh: 0cb7d052a98a861a
 /deepseek-harness-desktop/package/runtime-file-selection:
-  en: f0e345fd89868803
-  zh: fd2c775ad23fa2f0
+  en: 5261b87b6de217a4
+  zh: 12e48b273a8e8bdb
 /deepseek-harness-desktop/package/upload-updates:
   en: 72073b2e72590067
   zh: 63b1f9790395c37d

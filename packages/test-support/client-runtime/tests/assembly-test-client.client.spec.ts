@@ -46,6 +46,14 @@ describe('TestClient (jsdom)', () => {
     expect(globals.EventSource).toBeDefined()
     expect(globals.ResizeObserver).toBeDefined()
     expect(window.matchMedia('(max-width: 1023px)').matches).toBe(false)
+    const media = window.matchMedia('(max-width: 1023px)')
+    const listener = vi.fn()
+    // oxlint-disable-next-line typescript/no-deprecated -- Exercise the shim's legacy browser API.
+    media.addListener(listener)
+    expect(media.dispatchEvent(new Event('change'))).toBe(true)
+    expect(listener).not.toHaveBeenCalled()
+    // oxlint-disable-next-line typescript/no-deprecated -- Exercise the shim's legacy browser API.
+    media.removeListener(listener)
     expect(document.fonts).toBeInstanceOf(EventTarget)
     await client.dispose()
     expect(document.body.contains(container)).toBe(false)

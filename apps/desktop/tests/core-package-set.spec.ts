@@ -111,5 +111,7 @@ it('pins an image runtime that supports Node 24 on Windows ia32', async () => {
     schemaVersion: 1, version: '1.2.3', hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
     nodeVersion: '24.11.1', pnpmVersion: '11.7.0',
   }, { platform: 'win32', arch: 'ia32' })
-  expect(readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')).toContain('"sharp": "0.34.5"')
+  const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
+  expect(workspace).toContain('"sharp": "0.34.5"')
+  expect(workspace.split('allowBuilds:\n')[1]).toContain('  sharp: true\n')
 })

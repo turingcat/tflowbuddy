@@ -10,7 +10,7 @@
     baseURL: !!js process.env.DSH_SNAPSHOT_BASE_URL
     thinking: enabled
     reasoningEffort: low
-    streamIdleTimeoutMs: 150
+    # Idle-timeout behavior belongs to provider tests; this smoke uses the shipped budget.
 
 - id: agent-loop
   config:

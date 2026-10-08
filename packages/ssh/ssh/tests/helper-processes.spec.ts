@@ -215,6 +215,23 @@ describe.skipIf(process.platform === 'win32')('SSH helper process settlement', (
     }
   })
 
+  it('rolls back a listener allocation when the server emits an allocation error', async () => {
+    const root = await mkdtemp('/tmp/dsh-ssh-listen-event-')
+    const owner = new RemoteProcesses(new Context(), root, 1, 5000)
+    const listen = vi.spyOn(Server.prototype, 'listen').mockImplementationOnce(function (this: Server) {
+      this.emit('error', Object.assign(new Error('socket path in use'), { code: 'EADDRINUSE' }))
+      return this
+    })
+    try {
+      await expect(owner.prepare(ordinaryRequest)).rejects.toThrow('socket path in use')
+      expect(await readdir(root)).toEqual([])
+    } finally {
+      listen.mockRestore()
+      await owner.close()
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('continues collecting while a live snapshot waits for acknowledgement', async () => {
     const test = await harness()
     const child = ordinary()
