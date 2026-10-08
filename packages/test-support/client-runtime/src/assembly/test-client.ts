@@ -68,9 +68,22 @@ const DEFAULT_CONNECT_TIMEOUT_MS = 5_000
 /**
  * Browser globals jsdom lacks that roster plugins touch at apply or mount:
  * client-hmr opens an `EventSource`; layout components observe size and font loading.
+ * Pocket reads media queries; the default viewport does not match narrow-screen queries.
  * Inert stand-ins, installed only where the global is absent.
  */
 const JSDOM_SHIMS: Readonly<Record<string, unknown>> = {
+  matchMedia: (query: string): MediaQueryList => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy browser methods.
+    addListener(): void {},
+    // oxlint-disable-next-line typescript/no-deprecated -- MediaQueryList requires the legacy browser methods.
+    removeListener(): void {},
+    addEventListener(): void {},
+    removeEventListener(): void {},
+    dispatchEvent: () => true,
+  }),
   EventSource: class {
     addEventListener(): void {}
     close(): void {}

@@ -12,7 +12,7 @@
 .balanceCard {
   padding: 12px 16px;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
+  border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-module-platform);
 }
 
@@ -75,7 +75,7 @@
   min-width: 58px;
   padding: 0 12px;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-family: inherit;
@@ -89,7 +89,7 @@
 }
 
 .linkButton:focus-visible {
-  outline: 2px solid var(--dsw-alias-button-primary-fill);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
 
@@ -98,7 +98,7 @@
   height: 32px;
   padding: 0 12px;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-md);
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-family: inherit;
@@ -117,6 +117,6 @@
 }
 
 .retry:focus-visible {
-  outline: 2px solid var(--dsw-alias-button-primary-fill);
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
