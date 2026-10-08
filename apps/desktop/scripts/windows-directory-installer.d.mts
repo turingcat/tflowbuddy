@@ -15,6 +15,13 @@ export function directoryInstallSection(source: string): string
 export function directoryInstallerExits(source: string): string
 
 /**
+ * Select the installer UI resources beside one target's artifact directory.
+ * @param outputDirectory - Signed or unsigned target artifact directory.
+ * @returns NSIS definition overriding the template's development default.
+ */
+export function directoryInstallerHeader(outputDirectory: string): string
+
+/**
  * Keep user-data removal in the native helper, which refuses unsafe roots and never follows links.
  * @param source - Pinned upstream uninstaller source.
  * @returns Uninstaller with long-path application removal and no upstream RMDir data removal.

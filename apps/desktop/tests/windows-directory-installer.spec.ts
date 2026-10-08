@@ -3,11 +3,19 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { expect, it } from 'vitest'
-import { directoryInstallerExits, directoryInstallSection, directoryUninstaller } from '../scripts/windows-directory-installer.mjs'
+import { directoryInstallerExits, directoryInstallSection, directoryUninstaller, directoryInstallerHeader } from '../scripts/windows-directory-installer.mjs'
 
 const require = createRequire(import.meta.url)
 const section = readFileSync(join(dirname(require.resolve('app-builder-lib/package.json')),
   'templates/nsis/installSection.nsh'), 'utf8')
+
+it.each(['win-x64', 'win-ia32'])('binds installer resources to the %s target', (target) => {
+  const root = join('/build', 'targets', target)
+  for (const output of ['artifacts', 'unsigned-artifacts']) {
+    expect(directoryInstallerHeader(join(root, output)))
+      .toBe(`!define INSTALLER_BUILD_DIR "${join(root, 'installer-ui')}"\n`)
+  }
+})
 
 it('keeps data cleanup out of the upstream template while retaining application removal and registration cleanup', () => {
   const source = readFileSync(join(dirname(require.resolve('app-builder-lib/package.json')), 'templates/nsis/uninstaller.nsh'), 'utf8')
