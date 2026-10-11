@@ -102,7 +102,7 @@ SectionEnd
     await writeFile(strings, sourceStrings.split('\n').filter((line) =>
       !line.startsWith('LangString ') || line.includes(`\${LANG_${languageId}}`)).join('\n'))
     const include = join(languageOutput, 'include.nsh')
-    await writeFile(include, `!define INSTALLER_BUILD_DIR "${join(output, 'ui')}"\n!define INSTALLER_STRINGS_FILE "${strings}"\n!include "${join(appRoot, 'scripts', 'installer.nsh')}"\n`)
+    await writeFile(include, `!define /ifndef INSTALLER_BUILD_DIR "${join(output, 'ui')}"\n!define INSTALLER_STRINGS_FILE "${strings}"\n!include "${join(appRoot, 'scripts', 'installer.nsh')}"\n`)
     await build({ projectDir: appRoot, prepackaged: payload, targets: Platform.WINDOWS.createTarget(['nsis'], Arch.x64), publish: 'never',
       config: { ...config, productName, extraMetadata: { ...config.extraMetadata, name: packageName },
         artifactName: 'installer-test.exe', directories: { output: languageOutput },

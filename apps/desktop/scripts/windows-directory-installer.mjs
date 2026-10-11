@@ -70,6 +70,11 @@ export function installWindowsDirectoryInstaller() {
   const prototype = NsisTarget.prototype
   if (prototype[patched]) return
   prototype[patched] = true
+  const computeHeader = prototype.computeCommonInstallerScriptHeader
+  prototype.computeCommonInstallerScriptHeader = async function (...args) {
+    const header = await computeHeader.call(this, ...args)
+    return `${directoryInstallerHeader(this.outDir)}${header}`
+  }
   const compute = prototype.computeFinalScript
   prototype.computeFinalScript = async function (source, ...args) {
     const directory = join(this.outDir, '.nsis-directory-installer')
@@ -89,7 +94,7 @@ export function installWindowsDirectoryInstaller() {
     const uninstaller = join(directory, 'uninstaller.nsh')
     await writeFile(uninstaller, directoryUninstaller(await readFile(join(templates, 'uninstaller.nsh'), 'utf8')))
     adapted = replaceOnce(adapted, '!include "uninstaller.nsh"', `!include "${uninstaller}"`)
-    return `${directoryInstallerHeader(this.outDir)}!define DSH_UPDATER_CACHE_NAME "${this.packager.appInfo.updaterCacheDirName}"\n!define DSH_SEVENZIP_PATH "${tool}"\n!define DSH_SEVENZIP_LICENSE_DIR "${dirname(dirname(sourceTool))}"\n${await compute.call(this, adapted, ...args)}`
+    return `!define DSH_UPDATER_CACHE_NAME "${this.packager.appInfo.updaterCacheDirName}"\n!define DSH_SEVENZIP_PATH "${tool}"\n!define DSH_SEVENZIP_LICENSE_DIR "${dirname(dirname(sourceTool))}"\n${await compute.call(this, adapted, ...args)}`
   }
 }
 
