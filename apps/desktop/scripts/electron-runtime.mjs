@@ -1,18 +1,18 @@
 /**
- * Electron 40 runtime source table for the desktop packaging pipeline.
+ * Electron runtime source table for the desktop packaging pipeline.
  *
- * macOS uses the official npm-distributed Electron artifacts; Windows 7
- * support requires the community Electron-for-windows-7 rebuild, pinned by
- * release tag and per-architecture SHA-256 digests. The table is the single
+ * macOS and Windows x64 use the official npm-distributed Electron artifacts;
+ * Windows 7 (win-ia32) support requires the community Electron-for-windows-7 rebuild,
+ * pinned by release tag and per-architecture SHA-256 digests. The table is the single
  * source of truth: consumers derive URLs from `repository` + `version` +
  * asset `name` instead of hardcoding strings.
  */
 
-/** Official Electron release consumed on macOS via the `electron` npm package. */
-export const ELECTRON_VERSION = '40.10.6'
+/** Official Electron release consumed on macOS and Windows x64 via the `electron` npm package. */
+export const ELECTRON_VERSION = '44.0.0'
 
 /**
- * Community Electron-for-windows-7 release consumed on Windows.
+ * Community Electron-for-windows-7 release consumed on Windows 7 32-bit (ia32).
  *
  * `sha256` values are the published digests of the release assets; the
  * downloader MUST verify them before unpacking.
@@ -47,7 +47,10 @@ export function resolveElectronRuntimeSource(platform, arch) {
   if (platform === 'darwin' && (arch === 'arm64' || arch === 'x64')) {
     return { kind: 'official', platform, arch, version: ELECTRON_VERSION }
   }
-  if (platform === 'win32' && (arch === 'x64' || arch === 'ia32')) {
+  if (platform === 'win32' && arch === 'x64') {
+    return { kind: 'official', platform, arch, version: ELECTRON_VERSION }
+  }
+  if (platform === 'win32' && arch === 'ia32') {
     const asset = WINDOWS_COMMUNITY_ELECTRON.assets[arch]
     return {
       kind: 'community',

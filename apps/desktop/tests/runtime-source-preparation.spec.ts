@@ -47,7 +47,7 @@ describe('runtime archive verification', () => {
   it('rejects a community download whose digest differs from the pinned value before extraction', async () => {
     const root = scratch()
     vi.stubGlobal('fetch', vi.fn(async () => new Response('forged-bytes', { status: 200 })))
-    await expect(prepareElectronRuntime('win-x64', join(root, 'electron'), join(root, 'cache')))
+    await expect(prepareElectronRuntime('win-ia32', join(root, 'electron'), join(root, 'cache')))
       .rejects.toThrow(/digest mismatch/u)
     // A rejected archive must never reach the target distribution directory.
     expect(() => readFileSync(join(root, 'electron', 'electron.exe'))).toThrow(/ENOENT/u)
@@ -57,13 +57,13 @@ describe('runtime archive verification', () => {
     const root = scratch()
     const cache = join(root, 'cache')
     mkdirSync(cache, { recursive: true })
-    writeFileSync(runtimeArchiveCachePath(cache, 'win-x64', {
-      archive: 'dist.zip',
-      sha256: 'ed4ebb022624ae38f764fcfc1dc1ce30fe2145298975d4c90e8d95412deeadea',
+    writeFileSync(runtimeArchiveCachePath(cache, 'win-ia32', {
+      archive: 'dist-x86.zip',
+      sha256: '0a7560eae08360a6181510e0f20fd4c8f26a471c5118a427958a1d5974b767e5',
     }), 'tampered')
     const fetchMock = vi.fn(async () => new Response('unused', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    await expect(prepareElectronRuntime('win-x64', join(root, 'electron'), cache)).rejects.toThrow(/digest mismatch/u)
+    await expect(prepareElectronRuntime('win-ia32', join(root, 'electron'), cache)).rejects.toThrow(/digest mismatch/u)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -96,7 +96,7 @@ describe('runtime archive verification', () => {
 describe('prepared executable identity', () => {
   it('rejects an executable that is Node rather than the selected Electron release', () => {
     expect(() => readElectronRuntimeFacts(process.execPath, {
-      platform: process.platform, arch: process.arch, version: '40.10.6',
+      platform: process.platform, arch: process.arch, version: '44.0.0',
     })).toThrow(/prepared Electron/u)
   })
 })
