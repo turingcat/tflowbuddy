@@ -2,7 +2,7 @@
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { desktopEdition } from '../src/edition.ts'
-import { resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
+import { desktopTargetPlatform, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 import { readDesktopRuntime, verifyDesktopRuntime } from '../src/runtime-tree.ts'
 import { verifyWindowsCode } from './windows-runtime-signature.mjs'
 import { smokePreparedRuntime } from './smoke-prepared-runtime.ts'
@@ -11,9 +11,11 @@ import { resolveDesktopPackageTarget } from './package-target.ts'
 const paths = resolveDesktopTargetBuildPaths()
 const { values } = parseArgs({ options: { unsigned: { type: 'boolean', default: false } }, allowPositionals: false })
 const target = resolveDesktopBuildTarget()
-const windows = target === 'win-x64'
+const { platform, arch } = desktopTargetPlatform(target)
+const windows = platform === 'win32'
 const artifacts = values.unsigned ? paths.unsignedArtifacts : paths.artifacts
-const application = windows ? join(artifacts, 'win-unpacked')
+const windowsUnpacked = arch === 'ia32' ? 'win-ia32-unpacked' : 'win-unpacked'
+const application = windows ? join(artifacts, windowsUnpacked)
   : join(artifacts, target === 'mac-arm64' ? 'mac-arm64' : 'mac', `${desktopEdition.productName}.app`, 'Contents')
 const resources = join(application, windows ? 'resources' : 'Resources')
 const executable = windows
