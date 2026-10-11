@@ -135,6 +135,8 @@ Group membership is captured at setup. Dispose before observing changed groups, 
 
 The package enforces one separation: presentational React atoms with zero Cordis and zero slot knowledge, styled only through `--dsw-*` tokens, while every feature-specific concern (locale, session data, composition) stays in the composing plugin.
 
+Markdown parsers and extensions share one `micromark-util-types` version through the workspace override so their augmented token types remain compatible.
+
 ### Source map
 
 | File | Role |

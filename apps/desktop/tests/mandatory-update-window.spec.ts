@@ -8,7 +8,9 @@ import type { DesktopPolicyState } from '../src/mandatory-update-policy.ts'
 import type { DesktopUpdateState } from '../src/ipc.ts'
 
 const native = vi.hoisted(() => ({ handlers: new Map<string, (...args: unknown[]) => unknown>(),
-  open: vi.fn<(...args: unknown[]) => Promise<void>>(), write: vi.fn(), read: vi.fn(), quit: vi.fn() }))
+  open: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  write: vi.fn<(text: string) => void | Promise<void>>(),
+  read: vi.fn<() => string | Promise<string>>(), quit: vi.fn() }))
 vi.mock('electron', () => ({ ipcMain: {
   handle: (channel: string, handler: (...args: unknown[]) => unknown) => native.handlers.set(channel, handler),
   removeHandler: (channel: string) => native.handlers.delete(channel),
@@ -28,7 +30,7 @@ function fakeWindow() {
     loadURL: vi.fn(async () => {}), destroy: vi.fn(), isDestroyed: (): boolean => false,
     isFocused: () => true, isMinimized: () => false, focus: vi.fn(), show: vi.fn(), restore: vi.fn() })
 }
-afterEach(() => { ui?.dispose(); vi.restoreAllMocks(); vi.clearAllMocks(); native.handlers.clear(); vi.useRealTimers() })
+afterEach(() => { ui?.dispose(); vi.restoreAllMocks(); vi.resetAllMocks(); native.handlers.clear(); vi.useRealTimers() })
 function setup(platform: NodeJS.Platform = 'darwin') {
   vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
   window = fakeWindow()
@@ -131,6 +133,46 @@ it('reports clipboard failure and ignores completion after the policy destinatio
   f.policy({ blocking: true, checking: false, page: 'https://evil.example/desktop' })
   await expect(f.action('page')).rejects.toThrow(/no allowed/)
   expect(native.open).toHaveBeenCalledTimes(1)
+})
+
+it('waits for an asynchronous clipboard write and read before reporting a copied address', async () => {
+  const f = setup()
+  const written = Promise.withResolvers<undefined>()
+  native.write.mockReturnValueOnce(written.promise)
+  native.read.mockResolvedValueOnce('https://downloads.example.com/desktop')
+  const pending = f.action('copy')
+  expect(native.read).not.toHaveBeenCalled()
+  expect(f.view().navigation?.copy).toBeUndefined()
+  written.resolve(undefined)
+  await pending
+  expect(f.view().navigation).toEqual({ page: 'requested', copy: 'copied' })
+})
+
+it.each(['write', 'read'] as const)('reports an asynchronous clipboard %s rejection without clearing the policy', async (operation) => {
+  const f = setup()
+  native.write.mockResolvedValue(undefined)
+  native.read.mockResolvedValue('https://downloads.example.com/desktop')
+  native[operation].mockRejectedValueOnce(new Error('clipboard unavailable'))
+  await f.action('copy')
+  expect(f.view().navigation?.copy).toBe('failed')
+  expect(f.view().policy.blocking).toBe(true)
+})
+
+it.each(['policy-change', 'dispose'] as const)('ignores a pending clipboard read after %s', async (completion) => {
+  const f = setup()
+  const reading = Promise.withResolvers<undefined>()
+  const read = Promise.withResolvers<string>()
+  native.write.mockResolvedValueOnce(undefined)
+  native.read.mockImplementationOnce(() => { reading.resolve(undefined); return read.promise })
+  const pending = f.action('copy')
+  await reading.promise
+  if (completion === 'policy-change') f.policy({ blocking: true, checking: false, page: 'https://downloads.example.com/new' })
+  else ui!.dispose()
+  window.webContents.send.mockClear()
+  read.resolve('https://downloads.example.com/desktop')
+  await pending
+  expect(window.webContents.send).not.toHaveBeenCalled()
+  if (completion === 'policy-change') expect(f.view().navigation).toBeUndefined()
 })
 
 it('rejects same-URL child frames and removes quit from renderer privileges', () => {

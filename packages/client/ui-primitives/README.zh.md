@@ -135,6 +135,8 @@ kind: "package-library"
 
 本包只做一件事：提供零 cordis、零 slot 知识、仅经 `--dsw-*` token 设置样式的纯 React 原子组件，而所有功能专属的关注点（locale、会话数据、组合）都留在拼装它们的插件中。
 
+Markdown 解析器与扩展通过工作区 override 共用同一版本的 `micromark-util-types`，确保扩展后的 token 类型兼容。
+
 ### 源码地图
 
 | 文件 | 职责 |
