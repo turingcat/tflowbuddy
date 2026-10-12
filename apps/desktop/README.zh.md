@@ -197,7 +197,9 @@ Desktop 在 Host 启动后、打开工作区前检查模型 API Key 引用是否
 
 ### 发布版本
 
-TFlowBuddy 从 `0.1.0` 开始发布；第一方工作区包使用相同版本，保证内置运行时与桌面壳一致。[桌面发布工作流](../../.github/workflows/release.yml) 构建 Windows x64（`.exe`）和 macOS Apple 芯片（`.dmg`）安装包，包含 Electron、pnpm、Python 和应用运行时。`v<version>` 标签将两个安装包发布到 GitHub Releases；手动运行分支只保留构建产物。Windows 任务使用原生 PowerShell，macOS 任务使用 Bash；两个平台均在打包前运行运行时来源与准备过程的定向测试。此工作流采用未签名打包：Windows 安装包没有发布者签名，macOS 应用仅做临时签名，不做 Apple 公证。不单独发布 CLI、Python SDK、原生扩展或 npm 产品。
+TFlowBuddy 第一方工作区包使用相同产品版本，保证内置运行时与桌面壳一致。[桌面发布工作流](../../.github/workflows/release.yml) 构建 Windows ia32 和 x64（`.exe`）以及 macOS Apple 芯片（`.dmg`）安装包，包含 Electron、pnpm、Python 和应用运行时。`v<version>` 标签会把三个安装包发布到 GitHub Releases 和腾讯 COS；手动分支运行只保留构建产物。Windows 作业使用原生 PowerShell，macOS 作业使用 Bash；所有目标都在打包前运行运行时来源与准备流程的聚焦测试。该工作流使用无签名打包：Windows 安装包没有发布者签名，macOS 应用使用临时签名且不经过 Apple 公证。它不单独发布 CLI、Python SDK、原生扩展或 npm 产品。
+
+工作流产物使用 `TFlowBuddy-<platform>-v<version>-YYYYMMDDhhmm.<extension>`，平台为 `Win32`、`Win64` 或 `MacOS`，三个产物共用同一个北京时间戳；本地打包命名和应用版本保持不变。GitHub 的 `release` Environment 提供 `COS_BUCKET`、`COS_REGION` 变量以及 `COS_SECRET_ID`、`COS_SECRET_KEY` 密钥。不同标签的发布串行执行。[发布上传器](../../scripts/tflowbuddy-release.ts) 在写入 `tflowbuddy/` 前校验完整的三平台文件集合，只有所有安装包上传成功后，才把 `tflowbuddy/VERSION` 替换为 `<version>-YYYYMMDDhhmm` 加末尾换行。安装包上传失败时保持 `VERSION` 不变；PUT 不会自动重试。上传失败后，应先检查远端状态再重新运行。`VERSION` 带有 `Cache-Control: no-store, no-cache, max-age=0, must-revalidate`；CDN 基础设施还必须为 `/tflowbuddy/VERSION` 配置最高优先级的不缓存规则，并刷新已有缓存响应。安装包可缓存一年。本地 `.env` 和 `.env.*` 凭据文件由 Git 忽略；`.env.example` 和 `.env.*.example` 模板仍可跟踪。回环测试覆盖上传字节和顺序；发布人员负责验证真实 COS 上传和公开下载地址。
 
 TFlowBuddy 仅维护简体中文和英文。应用字典和打包后的 Electron 语言资源均限定为这两种语言；不支持的系统语言回退到英文。
 

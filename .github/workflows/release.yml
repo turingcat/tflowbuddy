@@ -9,15 +9,42 @@ permissions:
   contents: read
 
 concurrency:
-  group: desktop-release-${{ github.ref }}
+  group: desktop-release
   cancel-in-progress: false
 
 env:
   DSH_TELEMETRY_DISABLED: '1'
 
 jobs:
+  metadata:
+    name: Resolve shared release version
+    runs-on: ubuntu-24.04
+    outputs:
+      release_id: ${{ steps.version.outputs.release_id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Resolve release ID
+        id: version
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync, readFileSync } from 'node:fs';
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          const desktopVersion = JSON.parse(readFileSync('apps/desktop/package.json', 'utf8')).version;
+          if (version !== desktopVersion) throw new Error('Desktop and workspace versions differ');
+          if (process.env.GITHUB_REF_TYPE === 'tag' && process.env.GITHUB_REF_NAME !== `v${version}`) {
+            throw new Error(`Release tag must be v${version}`);
+          }
+          const timestamp = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().replace(/\D/g, '').slice(0, 12);
+          appendFileSync(process.env.GITHUB_OUTPUT, `release_id=${version}-${timestamp}\n`);
+          JS
+
   desktop:
     name: Desktop / ${{ matrix.target }}
+    needs: metadata
+    env:
+      RELEASE_ID: ${{ needs.metadata.outputs.release_id }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     strategy:
@@ -83,6 +110,7 @@ jobs:
       - name: Test desktop runtime packaging
         run: >-
           pnpm exec vitest run scripts/tests/desktop-release.spec.ts
+          scripts/tests/tflowbuddy-release.spec.ts
           apps/desktop/tests/electron-runtime.spec.ts
           apps/desktop/tests/desktop-build-paths.spec.ts
           apps/desktop/tests/package-target.spec.ts
@@ -90,22 +118,40 @@ jobs:
           apps/desktop/tests/primary-runtime-preparation.spec.ts
       - name: Package desktop with bundled runtime
         run: pnpm --dir apps/desktop run package ${{ matrix.target }} --unsigned
+      - name: Stage public installer name
+        run: >-
+          pnpm exec tsx scripts/tflowbuddy-release.ts stage ${{ matrix.target }}
+          apps/desktop/.desktop-build/targets/${{ matrix.target }}/unsigned-artifacts
+          apps/desktop/.desktop-build/release-installers/${{ matrix.target }}
       - name: Upload desktop installer
         uses: actions/upload-artifact@v4
         with:
           name: tflowbuddy-${{ matrix.target }}
-          path: apps/desktop/.desktop-build/targets/${{ matrix.target }}/unsigned-artifacts/tflowbuddy-*.${{ matrix.extension }}
+          path: apps/desktop/.desktop-build/release-installers/${{ matrix.target }}/*
           if-no-files-found: error
           retention-days: 14
 
   publish:
     name: Publish desktop installers
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: desktop
+    needs: [metadata, desktop]
     runs-on: ubuntu-24.04
+    environment: release
+    env:
+      RELEASE_ID: ${{ needs.metadata.outputs.release_id }}
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@v4
         with:
           pattern: tflowbuddy-*
@@ -118,7 +164,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           shopt -s nullglob
-          installers=(installers/tflowbuddy-*.exe installers/tflowbuddy-*.dmg)
+          installers=(installers/TFlowBuddy-*.exe installers/TFlowBuddy-*.dmg)
           if [ "${#installers[@]}" -ne 3 ]; then
             echo 'Expected Windows x64, Windows ia32, and macOS ARM64 installers' >&2
             exit 1
@@ -128,3 +174,10 @@ jobs:
           else
             gh release create "$RELEASE_TAG" "${installers[@]}" --verify-tag --generate-notes --title "TFlowBuddy ${RELEASE_TAG#v}"
           fi
+      - name: Upload installers and VERSION to Tencent COS
+        env:
+          COS_BUCKET: ${{ vars.COS_BUCKET }}
+          COS_REGION: ${{ vars.COS_REGION }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+        run: pnpm exec tsx scripts/tflowbuddy-release.ts upload installers
