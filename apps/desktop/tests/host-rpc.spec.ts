@@ -53,18 +53,17 @@ describe('applyTFlowRoute', () => {
 
     const [route, key, directory, selection] = host.calls
     // The Host exposes settings namespaces only through the `settings` Remote; `/api/llm-pi-ai/update` answers 404.
-    expect(route).toMatchObject({ namespace: 'settings', method: 'update', args: { ns: 'llm-pi-ai' } })
-    expect(route!.args['patch']).toEqual({
-      providers: {
-        tflow: {
-          displayName: 'TFlow',
-          api: 'openai-completions',
-          baseURL: 'https://tflow.online/v1',
-          apiKeyEnv: 'TFLOW_MODEL_KEY',
-          models: [{ id: 'glm-5' }, { id: 'qwen3' }],
-        },
-      },
-    })
+    expect(route).toMatchObject({ namespace: 'settings', method: 'mutate', args: { ns: 'llm-pi-ai' } })
+    expect(route!.args['ops']).toEqual([
+      { op: 'unset', path: ['providers', '9router'] },
+      { op: 'set', path: ['providers', 'tflow'], value: {
+        displayName: 'TFlow',
+        api: 'openai-completions',
+        baseURL: 'https://tflow.online/v1',
+        apiKeyEnv: 'TFLOW_MODEL_KEY',
+        models: [{ id: 'glm-5' }, { id: 'qwen3' }],
+      } },
+    ])
     expect(key).toMatchObject({ namespace: 'credentials', method: 'set', args: { ref: 'TFLOW_MODEL_KEY', value: 'sk-model' } })
     // The Host exposes no `llm` Remote; `session/modelCatalog` is its model directory.
     expect(directory).toEqual({ namespace: 'session', method: 'modelCatalog', args: {} })

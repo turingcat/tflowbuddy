@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.1.2/tflow-model-refresh/guide.md
+/:
+  en: 27ab9d4587627d72
+  zh: 865df2339c00bce4
+/tflowbuddy-refreshes-its-model-providers-at-sign-in:
+  en: b747f6364ef1c276
+  zh: 616cbb5f01d86d8e
+/tflowbuddy-refreshes-its-model-providers-at-sign-in/change:
+  en: 532c97c79945eb7c
+  zh: 35b7c8f92ee67c09
+/tflowbuddy-refreshes-its-model-providers-at-sign-in/migration:
+  en: fac25747feddbb35
+  zh: b53ac1aec8e83993

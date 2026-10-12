@@ -1,0 +1,3 @@
+- menu:
+  - menuitem "设置"
+  - menuitem "退出登录"

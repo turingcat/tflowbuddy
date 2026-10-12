@@ -222,7 +222,7 @@ export function SidebarRoot({
           const identity = (
             <span className={css.brandIdentity} aria-hidden="true">
               <span className={css.brandMark}>
-                {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <TFlowLogo size={24} /> })}
+                {renderSlot('sidebar.brand.mark', { size: 32 }, { fallback: <TFlowLogo size={32} /> })}
               </span>
               <span className={css.brandName}>
                 {renderSlot('sidebar.brand.name', {}, {

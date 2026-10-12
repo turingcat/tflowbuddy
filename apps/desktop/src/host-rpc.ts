@@ -98,7 +98,8 @@ function modelEntry(id: string): Record<string, unknown> {
 
 /**
  * Publish the TFlow provider route, the key it resolves, and the default model
- * new agents start from.
+ * new agents start from. Each application replaces the complete TFlow route
+ * and removes the obsolete 9router route; unrelated providers are preserved.
  *
  * The route is declared inline rather than left to the installed catalog: the
  * gateway is not a catalog provider, so its protocol, endpoint, and model list
@@ -121,20 +122,19 @@ export async function applyTFlowRoute(
 ): Promise<void> {
   await invoke({
     namespace: 'settings',
-    method: 'update',
+    method: 'mutate',
     args: {
       ns: PROVIDER_NAMESPACE,
-      patch: {
-        providers: {
-          [TFLOW_PROVIDER]: {
-            displayName: 'TFlow',
-            api: 'openai-completions',
-            baseURL: credentials.gatewayUrl,
-            apiKeyEnv: MODEL_KEY_REF,
-            models: modelIds.map(modelEntry),
-          },
-        },
-      },
+      ops: [
+        { op: 'unset', path: ['providers', '9router'] },
+        { op: 'set', path: ['providers', TFLOW_PROVIDER], value: {
+          displayName: 'TFlow',
+          api: 'openai-completions',
+          baseURL: credentials.gatewayUrl,
+          apiKeyEnv: MODEL_KEY_REF,
+          models: modelIds.map(modelEntry),
+        } },
+      ],
       expectedRevision: undefined,
     },
   })

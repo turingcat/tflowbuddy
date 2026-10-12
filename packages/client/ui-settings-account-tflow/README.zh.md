@@ -28,7 +28,7 @@ kind: "package-reference"
 
 账号卡片与操作控件使用共享圆角尺度；键盘焦点环采用共享输入方式颜色。
 
-用户名菜单提供设置、账号管理和退出登录。用量仅在设置面板内提供。
+用户名菜单提供设置和退出登录。展开时菜单宽度跟随启动器，两侧保留侧栏内边距；收起时保留紧凑菜单。账号管理和用量仍位于设置面板内。
 
 在桌面应用加载的浏览器 roster 中挂载本插件。它通过 `settings.section` 提供账号页面（`tflow-account`）与用量页面（`tflow-usage`），并通过 `settings.launcher` 提供侧栏启动器；启动器显示已登录用户名，并在挂载时发起账号读取。
 
@@ -39,7 +39,7 @@ kind: "package-reference"
 <a id="understand-the-implementation"></a>
 ## 理解实现
 
-`src/client/AccountSection.tsx` 渲染账号页面，`src/client/AccountMenu.tsx` 渲染启动器；两者都通过 `useAccount` hook 席位消费同一份快照，并通过 inject face 调用 `refresh` 与 `manage`。`src/client/UsageSection.tsx` 通过 `useUsage` hook 席位从另一份快照渲染用量页面。`src/client/index.ts` 在 apply 时读取外壳的 `dshDesktopAccount` 桥一次；对桥的 `read` 与 `usage` 两个操作，它向订阅者发布快照，把并发刷新合并为一次请求，并在载荷到达组件之前完成校验。外壳从面板的 `/api/v1/usage/dashboard/stats` 应答 `usage`，页面展示实际扣费金额（`actual_cost`），而非标准计价。
+`src/client/AccountSection.tsx` 渲染账号页面，`src/client/AccountMenu.tsx` 渲染启动器；两者都通过 `useAccount` hook 席位消费同一份快照。账号页面通过 inject face 调用 `refresh` 与 `manage`，启动器调用 `refresh` 与 `signOut`。`src/client/UsageSection.tsx` 通过 `useUsage` hook 席位从另一份快照渲染用量页面。`src/client/index.ts` 在 apply 时读取外壳的 `dshDesktopAccount` 桥一次；对桥的 `read` 与 `usage` 两个操作，它向订阅者发布快照，把并发刷新合并为一次请求，并在载荷到达组件之前完成校验。外壳从面板的 `/api/v1/usage/dashboard/stats` 应答 `usage`，页面展示实际扣费金额（`actual_cost`），而非标准计价。
 
 本包不持有会话状态，也不持有凭证。面板会话、模型密钥与令牌生命周期属于 `apps/desktop`，由它拥有登录流程；本包只渲染该流程上报的结果。
 

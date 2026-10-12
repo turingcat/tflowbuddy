@@ -65,10 +65,12 @@ describe('SidebarRoot.module.css', () => {
   })
 
   it('keeps the slotted brand row at the full artwork height', () => {
-    expect(declarations('.brandIdentity')?.get('height')).toBe('24px')
-    expect(declarations('.brandName')?.get('height')).toBe('24px')
-    expect(declarations('.brandName')?.get('line-height')).toBe('24px')
-    expect(declarations('.brandName')?.get('font-size')).toBe('18px')
+    expect(declarations('.brandIdentity')?.get('height')).toBe('32px')
+    expect(declarations('.brandIdentity')?.get('gap')).toBe('8px')
+    expect(declarations('.brandName')?.get('height')).toBe('32px')
+    expect(declarations('.brandName')?.get('line-height')).toBe('32px')
+    expect(declarations('.brandName')?.get('font-size')).toBe('var(--dsw-font-l-20-font-size)')
+    expect(declarations('.brandName')?.get('font-weight')).toBe('500')
     expect(declarations('.fallbackBrandName')?.get('font-size')).toBe('17px')
     expect(declarations('.fallbackBrandName')?.get('white-space')).toBe('nowrap')
   })

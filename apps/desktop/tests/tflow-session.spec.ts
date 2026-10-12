@@ -427,6 +427,37 @@ describe('refresh', () => {
     expect(record.saved).toHaveLength(2)
   })
 
+  it('replaces the advertised models after the gateway changes its catalog', async () => {
+    const record = effects()
+    let models = [{ id: 'retired-model' }]
+    const session = createTFlowSession({
+      panelUrl: PANEL,
+      effects: record,
+      fetch: routed([
+        ['/v1/models', () => gateway({ data: models })],
+        ['/api/v1/auth/refresh', panel({ access_token: 'next', refresh_token: 'next-refresh' })],
+      ]),
+    })
+    await session.restore(signedIn)
+    models = [{ id: 'new-model' }, { id: 'another-model' }]
+    await expect(session.refresh()).resolves.toMatchObject({ kind: 'authenticated' })
+    expect(record.catalogs).toEqual([['retired-model'], ['new-model', 'another-model']])
+  })
+
+  it('never reports a usable restored session when its provider cannot be applied', async () => {
+    const record = effects()
+    record.apply = async () => { throw new Error('provider unavailable') }
+    const session = createTFlowSession({
+      panelUrl: PANEL,
+      effects: record,
+      fetch: routed([CATALOG, ['/api/v1/auth/refresh', panel({ access_token: 'next' })]]),
+    })
+    const seen: TFlowAuthState['kind'][] = []
+    session.subscribe((state) => { seen.push(state.kind) })
+    await expect(session.restore(signedIn)).resolves.toMatchObject({ kind: 'failed', message: 'provider unavailable' })
+    expect(seen).not.toContain('authenticated')
+  })
+
   it('keeps the stored refresh grant when the panel rotates only the access token', async () => {
     const session = createTFlowSession({
       panelUrl: PANEL,

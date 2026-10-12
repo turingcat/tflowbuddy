@@ -117,7 +117,7 @@ it('labels the section for assistive technology in the active language', async (
   expect(screen.getByRole('region').getAttribute('aria-label')).toBe(zh.nav)
 })
 
-it('offers settings and the account site from the launcher, and shows the account name', async () => {
+it('offers only settings and sign-out from the launcher, and shows the account name', async () => {
   const openSettings = vi.fn()
   const manage = vi.fn()
   const operations: TFlowAccountInjected = {
@@ -143,7 +143,7 @@ it('offers settings and the account site from the launcher, and shows the accoun
   expect(operations.refresh).toHaveBeenCalledOnce()
   expect(screen.getByRole('button', { name: zh.nav }).textContent).toBe('alice')
   fireEvent.click(screen.getByRole('button', { name: zh.nav }))
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([zh.settings, zh.manage, zh.signOut])
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([zh.settings, zh.signOut])
   await expect(`${screen.getByRole('menu').textContent}\n`).toMatchFileSnapshot('./expected/menu-zh.txt')
   fireEvent.click(screen.getByRole('menuitem', { name: zh.settings }))
   expect(openSettings).toHaveBeenCalledOnce()
@@ -153,7 +153,7 @@ it('offers settings and the account site from the launcher, and shows the accoun
   expect(operations.signOut).toHaveBeenCalledOnce()
 })
 
-it('opens the account site from the launcher and hides the name in the collapsed rail', async () => {
+it('hides the account name and omits account management in the collapsed rail', async () => {
   const manage = vi.fn()
   const operations: TFlowAccountInjected = {
     hooks: { account: source({ status: 'signed-out' }) },
@@ -176,8 +176,9 @@ it('opens the account site from the launcher and hides the name in the collapsed
   render(<TFlowAccountMenu {...props} />)
   expect(screen.getByRole('button', { name: en.nav }).textContent).toBe('')
   fireEvent.click(screen.getByRole('button', { name: en.nav }))
-  fireEvent.click(screen.getByRole('menuitem', { name: en.manage }))
-  expect(manage).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('menuitem', { name: en.manage })).toBeNull()
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([en.settings, en.signOut])
+  expect(manage).not.toHaveBeenCalled()
 })
 
 it('ships the same key set in both languages', () => {

@@ -94,7 +94,8 @@ export interface TFlowSignIn {
    */
   restore(credentials: TFlowCredentials): Promise<TFlowAuthState>
   /**
-   * Refresh the panel session and re-apply it to the provider.
+   * Refresh the panel session, fetch the current gateway models, and re-apply
+   * the provider before reporting an authenticated session.
    * @returns the state after the refresh.
    */
   refresh(): Promise<TFlowAuthState>
@@ -154,17 +155,32 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
    * backed out of a second sign-in with no session at all.
    */
   let incumbent: TFlowAuthState = { kind: 'signed-out' }
-  /**
-   * Models the gateway advertised for the current key. A refresh replaces only
-   * the session, so it republishes this catalog rather than an empty one that
-   * would leave the route serving nothing.
-   */
-  let advertised: readonly string[] = []
-
   const publish = (state: TFlowAuthState): TFlowAuthState => {
     current = state
     for (const listener of listeners) listener(state)
     return state
+  }
+
+  const refreshAuthenticated = async (stored: TFlowCredentials, refreshToken: string): Promise<TFlowAuthState> => {
+    try {
+      const rotated = await refreshSession(request, refreshToken)
+      const session = rotated.refreshToken === undefined ? { accessToken: rotated.accessToken, refreshToken } : rotated
+      const credentials: TFlowCredentials = { ...stored, session }
+      // Commit rotated grants even if later model discovery fails, so a retry
+      // does not reuse a refresh token the panel may have invalidated.
+      await options.effects.save(credentials)
+      const models = await listModels({ ...request, gatewayUrl: credentials.gatewayUrl }, credentials.modelKey)
+      if (models.length === 0) throw new TFlowProtocolError('protocol', 'TFlow 网关未返回可用模型')
+      await options.effects.apply(credentials, models.map(model => model.id))
+      return publish({ kind: 'authenticated', credentials })
+    } catch (error) {
+      if (error instanceof TFlowProtocolError && (error.kind === 'unauthorized' || error.kind === 'forbidden')) {
+        pending = undefined
+        await options.effects.clear()
+        await options.effects.revoke()
+      }
+      return publish(failureState(error))
+    }
   }
 
   /**
@@ -189,7 +205,7 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
     // The advertised catalog travels with the key: the route declares the
     // models the gateway serves, so a gateway that renames or retires one is
     // republished at the next sign-in rather than drifting.
-    advertised = models.map(model => model.id)
+    const advertised = models.map(model => model.id)
     await options.effects.apply(credentials, advertised)
     pending = undefined
     incumbent = { kind: 'signed-out' }
@@ -274,18 +290,7 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
         await options.effects.revoke()
         return publish({ kind: 'signed-out' })
       }
-      // A new process holds no advertised catalog, and the refresh republishes
-      // the route with it; an empty list is a route the provider refuses. The
-      // stored key re-reads the catalog, as provisioning does.
-      try {
-        const models = await listModels({ ...request, gatewayUrl: credentials.gatewayUrl }, credentials.modelKey)
-        if (models.length === 0) throw new TFlowProtocolError('protocol', 'TFlow 网关未返回可用模型')
-        advertised = models.map(model => model.id)
-      } catch (error) {
-        return publish(failureState(error))
-      }
-      publish({ kind: 'authenticated', credentials })
-      return this.refresh()
+      return refreshAuthenticated(credentials, credentials.session.refreshToken)
     },
 
     async refresh() {
@@ -293,33 +298,7 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
       if (state.kind !== 'authenticated') return state
       const refreshToken = state.credentials.session.refreshToken
       if (refreshToken === undefined) return state
-      try {
-        const rotated = await refreshSession(request, refreshToken)
-        // The panel treats the returned refresh token as optional. When it
-        // rotates only the access token, the grant that just worked stays in
-        // force; dropping it would sign the user out at the next refresh.
-        const session = rotated.refreshToken === undefined
-          ? { accessToken: rotated.accessToken, refreshToken }
-          : rotated
-        const credentials: TFlowCredentials = { ...state.credentials, session }
-        // Persist before applying: a provider serving a token the store has not
-        // committed would survive a restart as a session that cannot refresh.
-        await options.effects.save(credentials)
-        await options.effects.apply(credentials, advertised)
-        return publish({ kind: 'authenticated', credentials })
-      } catch (error) {
-        const failure = failureState(error)
-        // A refused grant is not recoverable, and leaving a dead session in
-        // place would keep failing every later request.
-        if (error instanceof TFlowProtocolError && (error.kind === 'unauthorized' || error.kind === 'forbidden')) {
-          pending = undefined
-          advertised = []
-          await options.effects.clear()
-          await options.effects.revoke()
-          return publish(failure)
-        }
-        return publish(failure)
-      }
+      return refreshAuthenticated(state.credentials, refreshToken)
     },
 
     abandon() {
@@ -332,7 +311,6 @@ export function createTFlowSession(options: TFlowSessionOptions): TFlowSignIn {
     async signOut() {
       pending = undefined
       incumbent = { kind: 'signed-out' }
-      advertised = []
       await options.effects.clear()
       await options.effects.revoke()
       return publish({ kind: 'signed-out' })

@@ -28,7 +28,7 @@ The package activates only inside a renderer the Electron shell loaded, identifi
 
 Account cards and actions use the shared radius scale; keyboard focus rings respect the shared input-modality color.
 
-The username menu offers Settings, account management, and sign-out. Usage is available inside Settings only.
+The username menu offers Settings and sign-out. Its expanded card follows the launcher width, leaving the sidebar padding visible; the collapsed rail keeps the compact menu. Account management and usage remain available inside Settings.
 
 Mount this plugin in a browser roster that the desktop application loads. It contributes an account page (`tflow-account`) and a usage page (`tflow-usage`) through `settings.section`, and a sidebar launcher through `settings.launcher` that shows the signed-in username and starts the account read when it mounts.
 
@@ -39,7 +39,7 @@ The signed-out, loading, and failed states are distinct: a signed-out account is
 <a id="understand-the-implementation"></a>
 ## Understand the implementation
 
-`src/client/AccountSection.tsx` renders the account page and `src/client/AccountMenu.tsx` the launcher; both consume one snapshot through the `useAccount` hook seat and call `refresh` and `manage` through the inject face. `src/client/UsageSection.tsx` renders the usage page from a separate snapshot through the `useUsage` hook seat. `src/client/index.ts` reads the shell's `dshDesktopAccount` bridge once at apply time; for its `read` and `usage` operations it publishes snapshots to subscribers, joins concurrent refreshes into one request, and validates every payload before it reaches a component. The shell answers `usage` from the panel's `/api/v1/usage/dashboard/stats`, and the page shows the deducted amount (`actual_cost`), not the standard price.
+`src/client/AccountSection.tsx` renders the account page and `src/client/AccountMenu.tsx` the launcher; both consume one snapshot through the `useAccount` hook seat. The account page calls `refresh` and `manage`; the launcher calls `refresh` and `signOut` through the inject face. `src/client/UsageSection.tsx` renders the usage page from a separate snapshot through the `useUsage` hook seat. `src/client/index.ts` reads the shell's `dshDesktopAccount` bridge once at apply time; for its `read` and `usage` operations it publishes snapshots to subscribers, joins concurrent refreshes into one request, and validates every payload before it reaches a component. The shell answers `usage` from the panel's `/api/v1/usage/dashboard/stats`, and the page shows the deducted amount (`actual_cost`), not the standard price.
 
 The package holds no session state and no credentials. The panel session, the model key, and the token lifecycle belong to `apps/desktop`, which owns the sign-in flow; this package renders what that flow reports.
 

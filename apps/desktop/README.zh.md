@@ -52,6 +52,7 @@ Windows 在整个运行期间常驻托盘图标。悬停提示为产品名，单
 
 TFlow 登录在隔离的欢迎页中读取站点的阿里云验证码配置。滑块凭据只随登录请求提交；欢迎页允许加载 `*.alicdn.com` 的验证码脚本及其 HTTPS 挑战资源，因为 `o.alicdn.com` 上的入口脚本会从同族 alicdn 主机加载滑块包。桌面图标和欢迎页标志的二进制文件与 AIBuddy 的 `ui/desktop/src/images/` 素材一致。
 
+手动登录、恢复登录和会话刷新均在获取 TFlow 网关当前模型列表后才报告会话可用。应用路由会替换 `llm-pi-ai.providers.tflow` 的全部字段，移除旧的 `llm-pi-ai.providers.9router`，并将首个可用 TFlow 模型设为新会话默认值。其他提供商和历史会话保持不变。模型获取或路由应用失败时不进入主界面；已轮换的刷新凭证仍会保存以供重试。
 
 设计师原稿位于 `resources/icon.png` 和 `resources/icon.svg`；平台适配保留鲸鱼与渐变，分别位于 `resources/icon-windows.*` 和 `resources/icon-macos.*`。将各平台 SVG 导出为透明的 1024×1024 PNG。electron-builder 为 Windows 应用、安装程序和卸载程序生成多尺寸 ICO（[Windows 图标要求](https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-construction)）。安装页面在两种主题下使用匹配的图案；卸载程序的欢迎和完成页共用 `installer/assets/uninstaller-sidebar.png`，准备阶段将其转换为 164×314 BMP。
 
