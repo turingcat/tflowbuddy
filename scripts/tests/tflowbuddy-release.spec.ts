@@ -68,7 +68,7 @@ async function multipartFixture(partReply?: (request: CosLoopbackRequest, respon
   })
   loopbacks.push(loopback)
   const cos = createDesktopCos({ secretId: 'fixture-id', secretKey: 'fixture-secret' }, 15_000,
-    { retryTimes: 5, parallelLimit: 4 })
+    { retryTimes: 5, parallelLimit: 4, useAccelerate: true })
   loopback.redirect(cos)
   return { cos, loopback, objects }
 }
@@ -154,6 +154,30 @@ describe('TFlowBuddy release installers', () => {
     expect(version.headers['content-type']).toBe('text/plain; charset=utf-8')
     expect(loopback.requests.filter(request => request.method === 'POST'
       && new URL(request.path, 'http://fixture').searchParams.has('uploads'))).toHaveLength(3)
+  })
+
+  it('uses the acceleration endpoint for multipart requests, verification, and VERSION when opted in', async () => {
+    const directory = await fixture()
+    for (const name of names) await writeFile(join(directory, name), 'installer')
+    const { cos, loopback } = await multipartFixture()
+    await uploadReleaseInstallers(directory, releaseId, { bucket: 'fixture-1250000000', region: 'ap-guangzhou' }, cos)
+    expect(loopback.requests.length).toBeGreaterThan(0)
+    for (const request of loopback.requests) {
+      const url = new URL(request.signedUrl!)
+      expect(url.protocol).toBe('https:')
+      expect(url.hostname).toBe('fixture-1250000000.cos.accelerate.myqcloud.com')
+      expect(request.headers.authorization).toMatch(/q-header-list=[^&]*\bhost\b/)
+    }
+    expect(loopback.requests.at(-1)!.path).toBe('/tflowbuddy/VERSION')
+  })
+
+  it('keeps ordinary COS clients on the regional endpoint', async () => {
+    const loopback = await startCosLoopback()
+    loopbacks.push(loopback)
+    const cos = createDesktopCos({ secretId: 'fixture-id', secretKey: 'fixture-secret' })
+    loopback.redirect(cos)
+    await cos.headObject({ Bucket: 'fixture-1250000000', Region: 'ap-guangzhou', Key: 'fixture' })
+    expect(new URL(loopback.requests[0]!.signedUrl!).hostname).toBe('fixture-1250000000.cos.ap-guangzhou.myqcloud.com')
   })
 
   it.each([false, true])('retries only a failed part at most five times; exhausted=%s', async (exhausted) => {

@@ -14,10 +14,12 @@ export interface DesktopCosCredentials {
   readonly secretKey: string
 }
 
-/** Explicit retry and concurrency limits for callers using multipart upload. */
+/** Explicit retry, concurrency, and endpoint selection for multipart upload callers. */
 export interface DesktopCosMultipartOptions {
   readonly retryTimes: number
   readonly parallelLimit: number
+  /** Use the global acceleration endpoint; requires acceleration enabled on the bucket. */
+  readonly useAccelerate?: boolean
 }
 
 /** Request options the SDK exposes to `before-send` listeners. */
@@ -32,12 +34,13 @@ interface CosRequestOptions {
  * `Content-MD5`, so the SDK cannot retry those requests. Multipart callers opt into bounded
  * part and completion retries; the SDK recreates each part stream and checks its MD5. Host
  * switching, redirect following, and clock-offset correction stay off so an ambiguous write is
- * never sent to another endpoint. The SDK also injects an empty `Cache-Control` header when the
- * caller names none; that header is removed here so uploading leaves cache policy to deployment
- * infrastructure.
+ * never sent to another endpoint. Global acceleration is opt-in and applies to every supported
+ * object request on the client, including verification and VERSION writes. The SDK also injects
+ * an empty `Cache-Control` header when the caller names none; that header is removed here so
+ * uploading leaves cache policy to deployment infrastructure.
  * @param credentials SecretId and SecretKey for the selected deployment.
  * @param timeoutMs Request-level inactivity deadline; a caller that must not wait out a transfer passes its own.
- * @param multipart Optional high-level multipart limits; ordinary streamed PUTs remain non-retrying.
+ * @param multipart Optional multipart limits and acceleration selection; ordinary clients stay regional and non-retrying.
  * @returns A COS client that sends HTTPS requests to the region named by each call.
  */
 export function createDesktopCos(credentials: DesktopCosCredentials, timeoutMs: number = TRANSFER_TIMEOUT_MS,
@@ -50,6 +53,7 @@ export function createDesktopCos(credentials: DesktopCosCredentials, timeoutMs: 
     FollowRedirect: false,
     AutoSwitchHost: false,
     CorrectClockSkew: false,
+    UseAccelerate: multipart?.useAccelerate ?? false,
     ChunkRetryTimes: multipart?.retryTimes ?? 0,
     ChunkParallelLimit: multipart?.parallelLimit ?? 3,
     Timeout: timeoutMs,

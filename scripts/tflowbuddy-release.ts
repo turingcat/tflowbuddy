@@ -152,7 +152,7 @@ if (isEntry(import.meta.url)) {
   } else if (command === 'upload' && target && source === undefined) {
     await uploadReleaseInstallers(target, releaseId, { bucket: requiredEnvironment('COS_BUCKET'), region: requiredEnvironment('COS_REGION') },
       createDesktopCos({ secretId: requiredEnvironment('COS_SECRET_ID'), secretKey: requiredEnvironment('COS_SECRET_KEY') },
-        undefined, { retryTimes: 5, parallelLimit: 4 }))
+        undefined, { retryTimes: 5, parallelLimit: 4, useAccelerate: true }))
   } else {
     throw new Error('Usage: tflowbuddy-release.ts stage <target> <source> <output> | upload <directory>')
   }
