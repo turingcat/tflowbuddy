@@ -1,11 +1,26 @@
 /** Stage and publish the three first-party Desktop release installers. */
 import { createHash } from 'node:crypto'
-import { constants, createReadStream } from 'node:fs'
+import { constants } from 'node:fs'
 import { copyFile, lstat, mkdir, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { createDesktopCos } from '../apps/desktop/scripts/desktop-cos.ts'
 import { isEntry } from './release/process.ts'
+
+const CHUNK_SIZE = 8 * 1024 * 1024
+const SAFE_FAILURE_CODES = new Set(['AccessDenied', 'InternalError', 'NoSuchBucket', 'NoSuchUpload', 'BadDigest',
+  'SignatureDoesNotMatch', 'RequestTimeout', 'TimeoutError', 'AbortError', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND',
+  'ObjectVerificationFailed'])
+
+function safeFailure(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return 'code=UNCLASSIFIED'
+  const candidates = ['code' in error ? error.code : undefined, 'name' in error ? error.name : undefined]
+  const code = candidates.find((value): value is string => typeof value === 'string' && SAFE_FAILURE_CODES.has(value)) ?? 'UNCLASSIFIED'
+  const status = 'statusCode' in error && typeof error.statusCode === 'number' ? `; http=${error.statusCode}` : ''
+  const requestId = 'RequestId' in error && typeof error.RequestId === 'string'
+    && /^[\w+/=.-]{1,128}$/.test(error.RequestId) ? `; requestId=${error.RequestId}` : ''
+  return `code=${code}${status}${requestId}`
+}
 
 /** COS destination configured by the release Environment. */
 export interface ReleaseDestination {
@@ -53,9 +68,7 @@ export async function stageReleaseInstaller(target: string, releaseId: string, s
 async function installerMetadata(path: string) {
   const file = await lstat(path)
   if (!file.isFile() || file.size === 0) throw new Error(`Expected a nonempty regular installer: ${path}`)
-  const md5 = createHash('md5')
-  for await (const bytes of createReadStream(path) as AsyncIterable<Buffer>) md5.update(bytes)
-  return { size: file.size, md5: md5.digest('base64') }
+  return { size: file.size }
 }
 
 /**
@@ -63,8 +76,8 @@ async function installerMetadata(path: string) {
  * @param directory - Downloaded workflow artifact directory.
  * @param releaseId - Shared release ID.
  * @param destination - COS bucket and region.
- * @param cos - Caller-owned COS transport; streamed requests are not retried.
- * @returns Completion after all four PUTs succeed; failure stops later PUTs.
+ * @param cos - Caller-owned COS transport with explicit multipart retry/concurrency limits.
+ * @returns Completion after multipart uploads pass length/ETag verification and VERSION is written.
  */
 export async function uploadReleaseInstallers(
   directory: string,
@@ -79,28 +92,50 @@ export async function uploadReleaseInstallers(
     name, path: join(directory, name), ...await installerMetadata(join(directory, name)),
   })))
   const version = Buffer.from(`${releaseId}\n`)
-  for (const artifact of [...artifacts, { name: 'VERSION', path: undefined, size: version.length, md5: createHash('md5').update(version).digest('base64') }]) {
+  for (const artifact of artifacts) {
     const key = `tflowbuddy/${artifact.name}`
-    const body = artifact.path === undefined ? Readable.from([version]) : createReadStream(artifact.path)
     try {
-      await cos.putObject({
+      let reported = -1
+      console.log(`Uploading ${key}: ${artifact.size} bytes, multipart 8 MiB`)
+      const uploaded = await cos.sliceUploadFile({
         Bucket: destination.bucket,
         Region: destination.region,
         Key: key,
-        Body: body,
-        ContentLength: artifact.size,
-        ContentType: artifact.path === undefined ? 'text/plain; charset=utf-8' : 'application/octet-stream',
-        Headers: { 'Content-MD5': artifact.md5 },
-        CacheControl: artifact.path === undefined ? 'no-store, no-cache, max-age=0, must-revalidate' : 'public, max-age=31536000, immutable',
+        FilePath: artifact.path,
+        ChunkSize: CHUNK_SIZE,
+        ContentType: 'application/octet-stream',
+        CacheControl: 'public, max-age=31536000, immutable',
+        onProgress({ loaded, total }) {
+          const percent = Math.floor(loaded / total * 10) * 10
+          if (percent <= reported) return
+          reported = percent
+          console.log(`Upload progress ${key}: ${percent}% (${loaded}/${total})`)
+        },
       })
-    } catch (_error) {
-      // SDK errors may contain signed URLs and credentials; expose only the failed key.
-      throw new Error(`COS PUT failed: ${key}; inspect remote state before rerunning`)
-    } finally {
-      body.destroy()
+      const remote = await cos.headObject({ Bucket: destination.bucket, Region: destination.region, Key: key })
+      if (remote.headers?.['content-length'] !== String(artifact.size) || remote.ETag !== uploaded.ETag) {
+        throw Object.assign(new Error('Remote object length or ETag differs'), { code: 'ObjectVerificationFailed' })
+      }
+    } catch (error) {
+      // Never expose SDK messages, request headers, or signed URLs.
+      throw new Error(`COS upload failed: ${key}; ${safeFailure(error)}; inspect remote state before rerunning`)
     }
     console.log(`Uploaded ${key}`)
   }
+  const body = Readable.from([version])
+  try {
+    await cos.putObject({
+      Bucket: destination.bucket, Region: destination.region, Key: 'tflowbuddy/VERSION', Body: body,
+      ContentLength: version.length, ContentType: 'text/plain; charset=utf-8',
+      Headers: { 'Content-MD5': createHash('md5').update(version).digest('base64') },
+      CacheControl: 'no-store, no-cache, max-age=0, must-revalidate',
+    })
+  } catch (error) {
+    throw new Error(`COS PUT failed: tflowbuddy/VERSION; ${safeFailure(error)}; inspect remote state before rerunning`)
+  } finally {
+    body.destroy()
+  }
+  console.log('Uploaded tflowbuddy/VERSION')
 }
 
 function requiredEnvironment(name: string): string {
@@ -116,7 +151,8 @@ if (isEntry(import.meta.url)) {
     console.log(await stageReleaseInstaller(target, releaseId, source, output))
   } else if (command === 'upload' && target && source === undefined) {
     await uploadReleaseInstallers(target, releaseId, { bucket: requiredEnvironment('COS_BUCKET'), region: requiredEnvironment('COS_REGION') },
-      createDesktopCos({ secretId: requiredEnvironment('COS_SECRET_ID'), secretKey: requiredEnvironment('COS_SECRET_KEY') }))
+      createDesktopCos({ secretId: requiredEnvironment('COS_SECRET_ID'), secretKey: requiredEnvironment('COS_SECRET_KEY') },
+        undefined, { retryTimes: 5, parallelLimit: 4 }))
   } else {
     throw new Error('Usage: tflowbuddy-release.ts stage <target> <source> <output> | upload <directory>')
   }

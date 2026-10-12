@@ -1,0 +1,88 @@
+name: Upload TFlowBuddy Release to COS
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Release workflow run containing the three completed installer artifacts
+        required: true
+        type: string
+      release_id:
+        description: Original product version and Beijing timestamp, without a leading v
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+  SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+  RELEASE_ID: ${{ inputs.release_id }}
+
+jobs:
+  upload:
+    name: Recover COS installer publication
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Verify source release run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          node --input-type=module <<'JS'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          const { SOURCE_RUN_ID: runId, RELEASE_ID: releaseId, GH_REPO: repo } = process.env;
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          if (!/^[1-9]\d{0,19}$/.test(runId ?? '')) throw new Error('Invalid source run ID');
+          if (!releaseId?.startsWith(`${version}-`) || !/^\d{12}$/.test(releaseId.slice(version.length + 1))) {
+            throw new Error('Release ID must match the current product version and original timestamp');
+          }
+          const api = path => JSON.parse(execFileSync('gh', ['api', `repos/${repo}/${path}`], {
+            encoding: 'utf8', env: { ...process.env, CLICOLOR_FORCE: '0', NO_COLOR: '1' },
+          }));
+          const source = api(`actions/runs/${runId}`);
+          if (source.path !== '.github/workflows/release.yml' || source.event !== 'push'
+            || source.head_branch !== `v${version}` || source.status !== 'completed') {
+            throw new Error('Expected a completed product-tag release workflow run');
+          }
+          const { jobs } = api(`actions/runs/${runId}/jobs?per_page=100`);
+          for (const target of ['win-ia32', 'win-x64', 'mac-arm64']) {
+            if (!jobs.some(job => job.name === `Desktop / ${target}` && job.conclusion === 'success')) {
+              throw new Error(`Source installer build did not succeed: ${target}`);
+            }
+          }
+          console.log(`Verified installer artifacts from release run ${runId}, commit ${source.head_sha}`);
+          JS
+      - uses: pnpm/action-setup@v4
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+          pattern: tflowbuddy-*
+          path: installers
+          merge-multiple: true
+      - name: Upload installers and VERSION to Tencent COS
+        env:
+          COS_BUCKET: ${{ vars.COS_BUCKET }}
+          COS_REGION: ${{ vars.COS_REGION }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+        run: pnpm exec tsx scripts/tflowbuddy-release.ts upload installers

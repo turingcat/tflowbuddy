@@ -14,25 +14,34 @@ export interface DesktopCosCredentials {
   readonly secretKey: string
 }
 
+/** Explicit retry and concurrency limits for callers using multipart upload. */
+export interface DesktopCosMultipartOptions {
+  readonly retryTimes: number
+  readonly parallelLimit: number
+}
+
 /** Request options the SDK exposes to `before-send` listeners. */
 interface CosRequestOptions {
   headers: Record<string, unknown>
 }
 
 /**
- * Create a COS client whose writes cannot be repeated by the SDK.
+ * Create a COS client with explicit multipart retry policy.
  *
- * The SDK retries a failed request only while the request body is not a stream, so every caller
- * supplies a stream with an explicit `ContentLength` and a precomputed `Content-MD5`. Host
+ * Ordinary PUT callers supply a stream with explicit `ContentLength` and precomputed
+ * `Content-MD5`, so the SDK cannot retry those requests. Multipart callers opt into bounded
+ * part and completion retries; the SDK recreates each part stream and checks its MD5. Host
  * switching, redirect following, and clock-offset correction stay off so an ambiguous write is
  * never sent to another endpoint. The SDK also injects an empty `Cache-Control` header when the
  * caller names none; that header is removed here so uploading leaves cache policy to deployment
  * infrastructure.
  * @param credentials SecretId and SecretKey for the selected deployment.
  * @param timeoutMs Request-level inactivity deadline; a caller that must not wait out a transfer passes its own.
+ * @param multipart Optional high-level multipart limits; ordinary streamed PUTs remain non-retrying.
  * @returns A COS client that sends HTTPS requests to the region named by each call.
  */
-export function createDesktopCos(credentials: DesktopCosCredentials, timeoutMs: number = TRANSFER_TIMEOUT_MS): COS {
+export function createDesktopCos(credentials: DesktopCosCredentials, timeoutMs: number = TRANSFER_TIMEOUT_MS,
+  multipart?: DesktopCosMultipartOptions): COS {
   const cos = new COS({
     SecretId: credentials.secretId,
     SecretKey: credentials.secretKey,
@@ -41,7 +50,8 @@ export function createDesktopCos(credentials: DesktopCosCredentials, timeoutMs: 
     FollowRedirect: false,
     AutoSwitchHost: false,
     CorrectClockSkew: false,
-    ChunkRetryTimes: 0,
+    ChunkRetryTimes: multipart?.retryTimes ?? 0,
+    ChunkParallelLimit: multipart?.parallelLimit ?? 3,
     Timeout: timeoutMs,
     UploadCheckContentMd5: false,
   })

@@ -51,7 +51,74 @@ function resolveMetadata(tag: string) {
   return { result, output: readFileSync(output, 'utf8') }
 }
 
+function verifyRecoverySource(overrides: {
+  runId?: string
+  releaseId?: string
+  path?: string
+  event?: string
+  branch?: string
+  status?: string
+  failedTarget?: string
+} = {}) {
+  const directory = mkdtempSync(resolve(tmpdir(), 'tflowbuddy-recovery-source-'))
+  directories.push(directory)
+  writeFileSync(resolve(directory, 'package.json'), JSON.stringify({ version: '0.1.1' }))
+  const recovery = load(readFileSync(resolve(root, '.github/workflows/upload-release.yml'), 'utf8')) as {
+    jobs: ReleaseWorkflow['jobs']
+  }
+  const run = recovery.jobs.upload!.steps.find(step => step.name === 'Verify source release run')!.run!
+  const source = { path: overrides.path ?? '.github/workflows/release.yml', event: overrides.event ?? 'push',
+    head_branch: overrides.branch ?? 'v0.1.1', status: overrides.status ?? 'completed', head_sha: 'fixture' }
+  const jobs = ['win-ia32', 'win-x64', 'mac-arm64'].map(target => ({ name: `Desktop / ${target}`,
+    conclusion: target === overrides.failedTarget ? 'failure' : 'success' }))
+  // Replace only the external GitHub read; execute the workflow's actual validation.
+  const script = run.trim().split('\n').slice(1, -1).join('\n').replace(
+    "import { execFileSync } from 'node:child_process';",
+    `const execFileSync = (_command, args) => JSON.stringify(args[1].includes('/jobs?') ? ${JSON.stringify({ jobs })} : ${JSON.stringify(source)});`,
+  )
+  const result = spawnSync(process.execPath, ['--input-type=module'], { cwd: directory, encoding: 'utf8', input: script,
+    env: { SOURCE_RUN_ID: overrides.runId ?? '123', RELEASE_ID: overrides.releaseId ?? '0.1.1-202610112009', GH_REPO: 'fixture/repo' },
+    timeout: 10_000 })
+  expect(result.error).toBeUndefined()
+  expect(result.signal).toBeNull()
+  return result
+}
+
 describe('TFlowBuddy desktop release', () => {
+  it('accepts a completed tagged source run whose three installer builds succeeded', () => {
+    const result = verifyRecoverySource()
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('Verified installer artifacts from release run 123')
+  })
+
+  it.each([
+    { runId: '../123' }, { releaseId: '0.1.2-202610112009' }, { releaseId: '0.1.1-20261011' },
+    { path: '.github/workflows/untrusted.yml' }, { event: 'workflow_dispatch' }, { branch: 'main' },
+    { status: 'in_progress' }, { failedTarget: 'win-ia32' },
+  ])('refuses an incompatible recovery source before downloading artifacts: %j', (overrides) => {
+    const result = verifyRecoverySource(overrides)
+    expect(result.status).toBe(1)
+    expect(result.stdout).toBe('')
+  })
+
+  it('recovers COS publication from retained artifacts without rebuilding or uploading GitHub assets', () => {
+    const recovery = load(readFileSync(resolve(root, '.github/workflows/upload-release.yml'), 'utf8')) as {
+      permissions: { actions: string; contents: string }
+      concurrency: { group: string; 'cancel-in-progress': boolean }
+      jobs: ReleaseWorkflow['jobs']
+    }
+    expect(recovery.permissions).toEqual({ contents: 'read', actions: 'read' })
+    expect(recovery.concurrency).toEqual({ group: 'desktop-release', 'cancel-in-progress': false })
+    expect(Object.keys(recovery.jobs)).toEqual(['upload'])
+    const job = recovery.jobs.upload!
+    expect(job.environment).toBe('release')
+    const download = job.steps.find(step => step.uses === 'actions/download-artifact@v4')!
+    expect(download.with?.['run-id']).toBe('${{ inputs.source_run_id }}')
+    expect(download.with?.['github-token']).toBe('${{ github.token }}')
+    expect(job.steps.at(-1)?.run).toBe('pnpm exec tsx scripts/tflowbuddy-release.ts upload installers')
+    expect(job.steps.some(step => step.run?.includes('gh release upload') || step.run?.includes('run package'))).toBe(false)
+  })
+
   it('resolves the product tag and one Beijing-time suffix before matrix builds', () => {
     const { result, output } = resolveMetadata('v0.1.1')
     expect(result.status, result.stderr).toBe(0)
