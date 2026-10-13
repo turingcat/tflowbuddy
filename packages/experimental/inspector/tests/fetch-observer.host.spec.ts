@@ -80,6 +80,62 @@ describe('full fetch observer', () => {
     expect(payload(records, 'fetch/end')).toMatchObject({ capturedBytes: 4, responseBodyTruncated: true })
   })
 
+  it.each(['URL', 'Request', 'undefined override', 'replacement signal', 'null override'] as const)(
+    'forwards the caller signal to native fetch for %s input', async (scenario) => {
+      const originalAbort = new AbortController()
+      const replacementAbort = new AbortController()
+      const request = new Request('https://example.test/signal', { signal: originalAbort.signal })
+      const input = scenario === 'URL' ? new URL(request.url) : request
+      const undefinedOverride: RequestInit = {}
+      Object.defineProperty(undefinedOverride, 'signal', { value: undefined })
+      const init = scenario === 'Request' ? undefined
+        : scenario === 'undefined override' ? undefinedOverride
+          : scenario === 'null override' ? { signal: null }
+            : { signal: replacementAbort.signal }
+      const expectedSignal = scenario === 'Request' || scenario === 'undefined override' ? request.signal : init?.signal
+      Object.defineProperty(globalThis, 'fetch', {
+        value: async (_request: Request, options?: RequestInit) => {
+          expect(options?.signal).toBe(expectedSignal)
+          return new Response('response')
+        },
+        writable: true,
+        configurable: true,
+      })
+      observer = installFetchObserver({ publish() {} }, {
+        maxRequestBodyBytes: 1_024,
+        maxResponseBodyBytes: 1_024,
+        maxChunkBytes: 4,
+      })
+
+      expect(await (await fetch(input, init)).text()).toBe('response')
+    },
+  )
+
+  it('reads an inherited signal getter once with the original init receiver', async () => {
+    const abort = new AbortController()
+    let reads = 0
+    const init: RequestInit = new class {
+      get signal(): AbortSignal {
+        expect(this).toBe(init)
+        if (++reads > 1) throw new Error('signal getter read more than once')
+        return abort.signal
+      }
+    }()
+    Object.defineProperty(globalThis, 'fetch', {
+      value: async (_request: Request, options?: RequestInit) => {
+        expect(options?.signal).toBe(abort.signal)
+        return new Response('response')
+      },
+      writable: true,
+      configurable: true,
+    })
+    observer = installFetchObserver({ publish() {} }, {
+      maxRequestBodyBytes: 1_024, maxResponseBodyBytes: 1_024, maxChunkBytes: 4,
+    })
+    expect(await (await fetch('https://example.test/signal-getter', init)).text()).toBe('response')
+    expect(reads).toBe(1)
+  })
+
   it('finishes response capture when the caller aborts after response headers', async () => {
     const records: InspectorRecordInput[] = []
     Object.defineProperty(globalThis, 'fetch', {

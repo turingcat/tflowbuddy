@@ -28,6 +28,7 @@ export interface FetchObserver {
 
 /**
  * Install full fetch capture for every later call through `globalThis.fetch`.
+ * Preserve caller cancellation signals, including Request inputs and explicit overrides.
  * @param publisher - Host source that receives fetch lifecycle records.
  * @param options - Per-body capture limits.
  * @returns The owner that stops capture and awaits pending body readers.
@@ -56,7 +57,20 @@ export function installFetchObserver(
   }
 
   const observedFetch: typeof fetch = async (input, init) => {
-    const request = new Request(input, init)
+    let suppliedSignal: AbortSignal | null | undefined
+    // Capture the signal during native option conversion without repeating caller getters.
+    const requestInit = init === undefined ? undefined : new Proxy(init, {
+      get(target, key) {
+        if (key === 'signal') {
+          suppliedSignal = target.signal
+          return suppliedSignal
+        }
+        const value: unknown = Reflect.get(target, key)
+        return value
+      },
+    })
+    const request = new Request(input, requestInit)
+    const signal = suppliedSignal === undefined && input instanceof Request ? input.signal : suppliedSignal
     const requestId = `fetch-${++nextRequestId}`
     publisher.publish('fetch/start', {
       requestId,
@@ -92,7 +106,8 @@ export function installFetchObserver(
 
     let response: Response
     try {
-      response = await Reflect.apply(original, globalThis, [request])
+      // Undici weakly links signals derived from temporary Requests; forward the caller's signal instead.
+      response = await original.call(globalThis, request, signal === undefined ? undefined : { signal })
     } catch (error) {
       publisher.publish('fetch/error', {
         requestId,
